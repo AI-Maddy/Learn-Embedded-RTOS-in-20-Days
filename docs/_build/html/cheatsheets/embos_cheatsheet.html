@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>embOS Cheat Sheet &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="embos-cheat-sheet">
+<h1>embOS Cheat Sheet<a class="headerlink" href="#embos-cheat-sheet" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<section id="initialization">
+<h3>Initialization<a class="headerlink" href="#initialization" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;RTOS.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">OS_Init</span><span class="p">();</span><span class="w">          </span><span class="c1">// Initialize RTOS</span>
+<span class="w">    </span><span class="n">OS_InitHW</span><span class="p">();</span><span class="w">        </span><span class="c1">// Initialize hardware</span>
+
+<span class="w">    </span><span class="c1">// Create tasks</span>
+
+<span class="w">    </span><span class="n">OS_Start</span><span class="p">();</span><span class="w">         </span><span class="c1">// Start multitasking (never returns)</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h3>
+<p><strong>RTOSInit_*.c</strong> or <strong>RTOS.h</strong> settings:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define OS_FSYS                100000000  </span><span class="c1">// CPU frequency</span>
+<span class="cp">#define OS_PCLK_TIMER          100000000  </span><span class="c1">// Timer frequency</span>
+<span class="cp">#define OS_TICK_FREQ           1000       </span><span class="c1">// Tick rate (Hz)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="task-api">
+<h2>Task API<a class="headerlink" href="#task-api" title="Link to this heading">¶</a></h2>
+<section id="create-terminate">
+<h3>Create/Terminate<a class="headerlink" href="#create-terminate" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_TASK</span><span class="w"> </span><span class="n">TCB_MyTask</span><span class="p">;</span>
+<span class="n">OS_STACKPTR</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Stack_MyTask</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+
+<span class="c1">// Task function</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">MyTask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Task body</span>
+<span class="w">        </span><span class="n">OS_DELAY</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Create task (static)</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">OS_CreateTask</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">pName</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_U8</span><span class="w"> </span><span class="n">Priority</span><span class="p">,</span><span class="w">         </span><span class="c1">// 1 = highest user priority</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pRoutine</span><span class="p">)(</span><span class="kt">void</span><span class="p">),</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">OS_STACKPTR</span><span class="w"> </span><span class="o">*</span><span class="n">pStack</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">StackSize</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">TimeSlice</span><span class="w">      </span><span class="c1">// 0 = no time slicing</span>
+<span class="p">);</span>
+
+<span class="c1">// Example</span>
+<span class="n">OS_CreateTask</span><span class="p">(</span><span class="o">&amp;</span><span class="n">TCB_MyTask</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;MyTask&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">MyTask</span><span class="p">,</span>
+<span class="w">              </span><span class="n">Stack_MyTask</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">Stack_MyTask</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="c1">// Create task (extended with context)</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">OS_CreateTaskEx</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">pName</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_U8</span><span class="w"> </span><span class="n">Priority</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">pRoutine</span><span class="p">)(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">),</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">OS_STACKPTR</span><span class="w"> </span><span class="o">*</span><span class="n">pStack</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">StackSize</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">TimeSlice</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pContext</span><span class="w">          </span><span class="c1">// Parameter passed to task</span>
+<span class="p">);</span>
+
+<span class="c1">// Terminate task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Terminate</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span><span class="w">  </span><span class="c1">// NULL = self</span>
+</pre></div>
+</div>
+</section>
+<section id="delay-yield">
+<h3>Delay/Yield<a class="headerlink" href="#delay-yield" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Delay (milliseconds)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DELAY</span><span class="p">(</span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">ms</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Delayms</span><span class="p">(</span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">ms</span><span class="p">);</span>
+
+<span class="c1">// Delay (ticks)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Delay</span><span class="p">(</span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">ticks</span><span class="p">);</span>
+
+<span class="c1">// Delay until absolute time</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DelayUntil</span><span class="p">(</span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">time</span><span class="p">);</span>
+
+<span class="c1">// Yield to equal/higher priority</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Yield</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-suspend">
+<h3>Priority/Suspend<a class="headerlink" href="#priority-suspend" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get/Set priority</span>
+<span class="n">OS_U8</span><span class="w"> </span><span class="nf">OS_GetPriority</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SetPriority</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">,</span><span class="w"> </span><span class="n">OS_U8</span><span class="w"> </span><span class="n">Priority</span><span class="p">);</span>
+
+<span class="c1">// Suspend/Resume</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Suspend</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span><span class="w">        </span><span class="c1">// NULL = self</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Resume</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_ResumeAllSuspendedTasks</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Check if task suspended</span>
+<span class="n">OS_BOOL</span><span class="w"> </span><span class="nf">OS_IsSuspended</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="task-info">
+<h3>Task Info<a class="headerlink" href="#task-info" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get current task</span>
+<span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_GetpCurrentTask</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Get task name</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_GetTaskName</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+
+<span class="c1">// Get stack info</span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="nf">OS_GetStackUsed</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="nf">OS_GetStackSize</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="nf">OS_GetStackSpace</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+
+<span class="c1">// Check stack</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CheckStack</span><span class="p">(</span><span class="n">OS_TASK</span><span class="w"> </span><span class="o">*</span><span class="n">pTask</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="semaphore-api">
+<h2>Semaphore API<a class="headerlink" href="#semaphore-api" title="Link to this heading">¶</a></h2>
+<section id="binary-semaphore">
+<h3>Binary Semaphore<a class="headerlink" href="#binary-semaphore" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="n">Semaphore</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CreateCSema</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">InitValue</span><span class="p">);</span>
+
+<span class="c1">// Wait (decrement, max wait if 0)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_WaitCSema</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_WaitCSemaTimed</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Signal (increment, max 1)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SignalCSema</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SignalCSemaMax</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">MaxValue</span><span class="p">);</span>
+
+<span class="c1">// Get count</span>
+<span class="n">OS_UINT</span><span class="w"> </span><span class="nf">OS_GetCSemaValue</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">);</span>
+
+<span class="c1">// Set count</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SetCSemaValue</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Value</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DeleteCSema</span><span class="p">(</span><span class="n">OS_CSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pCSema</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="counting-semaphore">
+<h3>Counting Semaphore<a class="headerlink" href="#counting-semaphore" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="n">Semaphore</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CreateRSema</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">);</span>
+
+<span class="c1">// Wait (decrement)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_WaitRSema</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_WaitRSemaTimed</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Signal (increment)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SignalRSema</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">);</span>
+
+<span class="c1">// Get/Set count</span>
+<span class="n">OS_UINT</span><span class="w"> </span><span class="nf">OS_GetRSemaValue</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SetRSemaValue</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Value</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DeleteRSema</span><span class="p">(</span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="o">*</span><span class="n">pRSema</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mutex-api-resource-semaphore">
+<h2>Mutex API (Resource Semaphore)<a class="headerlink" href="#mutex-api-resource-semaphore" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_RSEMA</span><span class="w"> </span><span class="n">Mutex</span><span class="p">;</span>
+
+<span class="c1">// Initialize (reuse RSEMA)</span>
+<span class="n">OS_CreateRSema</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mutex</span><span class="p">);</span>
+
+<span class="c1">// Use (lock)</span>
+<span class="n">OS_Use</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mutex</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_UseTimed</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mutex</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Unuse (unlock)</span>
+<span class="n">OS_Unuse</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mutex</span><span class="p">);</span>
+
+<span class="c1">// Get usage count</span>
+<span class="n">OS_UINT</span><span class="w"> </span><span class="nf">OS_Request</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mutex</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Supports priority inversion avoidance, allows nesting</strong></p>
+</section>
+<section id="mailbox-api">
+<h2>Mailbox API<a class="headerlink" href="#mailbox-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="n">Mailbox</span><span class="p">;</span>
+<span class="kt">char</span><span class="w"> </span><span class="n">MailboxBuffer</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+
+<span class="c1">// Create</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CreateMB</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_U16</span><span class="w"> </span><span class="n">sizeofMsg</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">maxnofMsg</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMsg</span>
+<span class="p">);</span>
+
+<span class="c1">// Example</span>
+<span class="n">OS_CreateMB</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Mailbox</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">MailboxBuffer</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">MailboxBuffer</span><span class="p">);</span>
+
+<span class="c1">// Put message (blocking)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_PutMail</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMail</span><span class="p">);</span>
+<span class="kt">char</span><span class="w"> </span><span class="nf">OS_PutMailTimed</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMail</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Put message (non-blocking)</span>
+<span class="kt">char</span><span class="w"> </span><span class="nf">OS_PutMailCond</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMail</span><span class="p">);</span>
+
+<span class="c1">// Put message (front)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_PutMailFront</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMail</span><span class="p">);</span>
+<span class="kt">char</span><span class="w"> </span><span class="nf">OS_PutMailFrontTimed</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMail</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Get message</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_GetMail</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pDest</span><span class="p">);</span>
+<span class="kt">char</span><span class="w"> </span><span class="nf">OS_GetMailTimed</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pDest</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+<span class="kt">char</span><span class="w"> </span><span class="nf">OS_GetMailCond</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pDest</span><span class="p">);</span>
+
+<span class="c1">// Wait for message (don&#39;t retrieve)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_WaitMail</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">);</span>
+
+<span class="c1">// Peek message</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_PeekMail</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pDest</span><span class="p">);</span>
+
+<span class="c1">// Clear mailbox</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_ClearMB</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">);</span>
+
+<span class="c1">// Get message count</span>
+<span class="n">OS_BOOL</span><span class="w"> </span><span class="nf">OS_GetMessageCnt</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DeleteMB</span><span class="p">(</span><span class="n">OS_MAILBOX</span><span class="w"> </span><span class="o">*</span><span class="n">pMB</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="queue-api">
+<h2>Queue API<a class="headerlink" href="#queue-api" title="Link to this heading">¶</a></h2>
+<p>Message queue (pointer-based):</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_Q</span><span class="w"> </span><span class="n">Queue</span><span class="p">;</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">QueueBuffer</span><span class="p">[</span><span class="mi">10</span><span class="p">];</span>
+
+<span class="c1">// Create</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Q_Create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="n">ppData</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Size</span>
+<span class="p">);</span>
+
+<span class="c1">// Example</span>
+<span class="n">OS_Q_Create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Queue</span><span class="p">,</span><span class="w"> </span><span class="n">QueueBuffer</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">);</span>
+
+<span class="c1">// Put (pointer)</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_Q_Put</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pData</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_Q_PutTimed</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pData</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+
+<span class="c1">// Put (front)</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_Q_PutFront</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pData</span><span class="p">);</span>
+
+<span class="c1">// Get (pointer)</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_Q_Get</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_Q_GetTimed</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_Q_GetBlocked</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+
+<span class="c1">// Peek</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_Q_Peek</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+
+<span class="c1">// Clear</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Q_Clear</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+
+<span class="c1">// Get message count</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_Q_GetMessageCnt</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+
+<span class="c1">// Check if pending</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_Q_IsInUse</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_Q_Delete</span><span class="p">(</span><span class="n">OS_Q</span><span class="w"> </span><span class="o">*</span><span class="n">pQ</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="event-api">
+<h2>Event API<a class="headerlink" href="#event-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_EVENT</span><span class="w"> </span><span class="n">Event</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_Create</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_CreateEx</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">);</span>
+
+<span class="c1">// Set events</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_Set</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_SetMask</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">);</span>
+
+<span class="c1">// Reset (clear) events</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_Reset</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_ResetMask</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">);</span>
+
+<span class="c1">// Wait for events</span>
+<span class="n">OS_UINT</span><span class="w"> </span><span class="nf">OS_EVENT_Wait</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Mask</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">WaitMode</span><span class="p">,</span><span class="w">       </span><span class="c1">// OS_EVENT_MODE_OR, OS_EVENT_MODE_AND, etc.</span>
+<span class="w">    </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span>
+<span class="p">);</span>
+
+<span class="c1">// Wait modes</span>
+<span class="cp">#define OS_EVENT_MODE_OR        (0)</span>
+<span class="cp">#define OS_EVENT_MODE_AND       (1 &lt;&lt; 0)</span>
+<span class="cp">#define OS_EVENT_MODE_OR_CLEAR  (1 &lt;&lt; 1)</span>
+<span class="cp">#define OS_EVENT_MODE_AND_CLEAR (OS_EVENT_MODE_AND | OS_EVENT_MODE_OR_CLEAR)</span>
+
+<span class="c1">// Get event mask</span>
+<span class="n">OS_UINT</span><span class="w"> </span><span class="nf">OS_EVENT_Get</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EVENT_Delete</span><span class="p">(</span><span class="n">OS_EVENT</span><span class="w"> </span><span class="o">*</span><span class="n">pEvent</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="timer-api">
+<h2>Timer API<a class="headerlink" href="#timer-api" title="Link to this heading">¶</a></h2>
+<section id="software-timers">
+<h3>Software Timers<a class="headerlink" href="#software-timers" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_TIMER</span><span class="w"> </span><span class="n">Timer</span><span class="p">;</span>
+
+<span class="c1">// Timer callback</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">TimerCallback</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Called from timer context</span>
+<span class="p">}</span>
+
+<span class="c1">// Create timer</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CreateTimer</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_TIMERROUTINE</span><span class="w"> </span><span class="o">*</span><span class="n">Callback</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span>
+<span class="p">);</span>
+
+<span class="c1">// Create timer (extended)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_CreateTimerEx</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_TIMERROUTINE_EX</span><span class="w"> </span><span class="o">*</span><span class="n">Callback</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pData</span>
+<span class="p">);</span>
+
+<span class="c1">// Start timer</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_StartTimer</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+
+<span class="c1">// Stop timer</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_StopTimer</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+
+<span class="c1">// Restart timer (change timeout)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_RetriggerTimer</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_SetTimerPeriod</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Period</span><span class="p">);</span>
+
+<span class="c1">// Get remaining time</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="nf">OS_GetTimerValue</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+
+<span class="c1">// Check if active</span>
+<span class="n">OS_BOOL</span><span class="w"> </span><span class="nf">OS_GetTimerStatus</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DeleteTimer</span><span class="p">(</span><span class="n">OS_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">pTimer</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="memory-management">
+<h2>Memory Management<a class="headerlink" href="#memory-management" title="Link to this heading">¶</a></h2>
+<section id="fixed-block-pools">
+<h3>Fixed Block Pools<a class="headerlink" href="#fixed-block-pools" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_MEMF</span><span class="w"> </span><span class="n">MemPool</span><span class="p">;</span>
+<span class="kt">char</span><span class="w"> </span><span class="n">MemPoolBuffer</span><span class="p">[</span><span class="mi">10</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">32</span><span class="p">];</span><span class="w">  </span><span class="c1">// 10 blocks of 32 bytes</span>
+
+<span class="c1">// Create</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_MEMF_Create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pPool</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">NumBlocks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">BlockSize</span>
+<span class="p">);</span>
+
+<span class="c1">// Example</span>
+<span class="n">OS_MEMF_Create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">MemPool</span><span class="p">,</span><span class="w"> </span><span class="n">MemPoolBuffer</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">);</span>
+
+<span class="c1">// Allocate block</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_MEMF_Alloc</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Purpose</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_MEMF_AllocTimed</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span><span class="w"> </span><span class="n">OS_TIME</span><span class="w"> </span><span class="n">Timeout</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Purpose</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_MEMF_Request</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Purpose</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+
+<span class="c1">// Free block</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_MEMF_Release</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMemBlock</span><span class="p">);</span>
+
+<span class="c1">// Get info</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_MEMF_GetNumFreeBlocks</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">OS_MEMF_GetMaxUsed</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">);</span>
+<span class="n">OS_BOOL</span><span class="w"> </span><span class="nf">OS_MEMF_IsInPool</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMemBlock</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_MEMF_Delete</span><span class="p">(</span><span class="n">OS_MEMF</span><span class="w"> </span><span class="o">*</span><span class="n">pMEMF</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="heap-management">
+<h3>Heap Management<a class="headerlink" href="#heap-management" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Allocate from heap</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_malloc</span><span class="p">(</span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">Size</span><span class="p">);</span>
+
+<span class="c1">// Free</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_free</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMemBlock</span><span class="p">);</span>
+
+<span class="c1">// Realloc</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">OS_realloc</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pMemBlock</span><span class="p">,</span><span class="w"> </span><span class="n">OS_UINT</span><span class="w"> </span><span class="n">NewSize</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="critical-sections">
+<h2>Critical Sections<a class="headerlink" href="#critical-sections" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Disable task switching</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EnterRegion</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_LeaveRegion</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Disable interrupts</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_IncDI</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_DecRI</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Disable interrupts (with state)</span>
+<span class="n">OS_U32</span><span class="w"> </span><span class="nf">OS_DI</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_RestoreI</span><span class="p">(</span><span class="n">OS_U32</span><span class="w"> </span><span class="n">State</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="system-functions">
+<h2>System Functions<a class="headerlink" href="#system-functions" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get system time (milliseconds)</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="nf">OS_GetTime</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="nf">OS_GetTime32</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Get/Set time (ticks)</span>
+<span class="n">OS_I32</span><span class="w"> </span><span class="nf">OS_GetTime_Cycles</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Convert time</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="nf">OS_ConvertCycles2us</span><span class="p">(</span><span class="n">OS_I32</span><span class="w"> </span><span class="n">Cycles</span><span class="p">);</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="nf">OS_ConvertCycles2ms</span><span class="p">(</span><span class="n">OS_I32</span><span class="w"> </span><span class="n">Cycles</span><span class="p">);</span>
+
+<span class="c1">// Idle task hook</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_OnIdle</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w">  </span><span class="c1">// User-defined function</span>
+</pre></div>
+</div>
+</section>
+<section id="performance-measurement">
+<h2>Performance Measurement<a class="headerlink" href="#performance-measurement" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Start measurement</span>
+<span class="n">OS_U32</span><span class="w"> </span><span class="n">t0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OS_GetTime_Cycles</span><span class="p">();</span>
+
+<span class="c1">// Code to measure</span>
+
+<span class="c1">// Get elapsed time</span>
+<span class="n">OS_U32</span><span class="w"> </span><span class="n">elapsed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OS_GetTime_Cycles</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">t0</span><span class="p">;</span>
+<span class="n">OS_TIME</span><span class="w"> </span><span class="n">us</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OS_ConvertCycles2us</span><span class="p">(</span><span class="n">elapsed</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="interrupt-handling">
+<h2>Interrupt Handling<a class="headerlink" href="#interrupt-handling" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Enter interrupt</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_EnterInterrupt</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="cp">#define OS_INT_Enter() OS_EnterInterrupt()</span>
+
+<span class="c1">// Leave interrupt</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_LeaveInterrupt</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="cp">#define OS_INT_Leave() OS_LeaveInterrupt()</span>
+
+<span class="c1">// Leave interrupt with task switch</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">OS_LeaveInterruptNoSwitch</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// ISR template</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">MyISR</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">OS_EnterInterrupt</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// ISR code</span>
+
+<span class="w">    </span><span class="n">OS_LeaveInterrupt</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="return-values">
+<h2>Return Values<a class="headerlink" href="#return-values" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">OS_OK</span><span class="w">                   </span><span class="c1">// 0 = Success</span>
+<span class="n">OS_ERR_TIMEOUT</span><span class="w">          </span><span class="c1">// Timeout occurred</span>
+<span class="n">OS_ERR_OVERRUN</span><span class="w">          </span><span class="c1">// Queue/mailbox full</span>
+
+<span class="c1">// Boolean</span>
+<span class="n">OS_TRUE</span><span class="w">                 </span><span class="c1">// 1</span>
+<span class="n">OS_FALSE</span><span class="w">                </span><span class="c1">// 0</span>
+</pre></div>
+</div>
+</section>
+<section id="example-application">
+<h2>Example Application<a class="headerlink" href="#example-application" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;RTOS.h&quot;</span>
+
+<span class="n">OS_STACKPTR</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Stack_Producer</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+<span class="n">OS_STACKPTR</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">Stack_Consumer</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+<span class="n">OS_TASK</span><span class="w"> </span><span class="n">TCB_Producer</span><span class="p">,</span><span class="w"> </span><span class="n">TCB_Consumer</span><span class="p">;</span>
+
+<span class="n">OS_Q</span><span class="w"> </span><span class="n">Queue</span><span class="p">;</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">QueueBuffer</span><span class="p">[</span><span class="mi">10</span><span class="p">];</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ProducerTask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">OS_Q_Put</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Queue</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">count</span><span class="p">);</span>
+<span class="w">        </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">OS_DELAY</span><span class="p">(</span><span class="mi">1000</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ConsumerTask</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">msg</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OS_Q_GetBlocked</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Queue</span><span class="p">);</span>
+<span class="w">        </span><span class="c1">// Process message</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">OS_Init</span><span class="p">();</span>
+<span class="w">    </span><span class="n">OS_InitHW</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">OS_Q_Create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">Queue</span><span class="p">,</span><span class="w"> </span><span class="n">QueueBuffer</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">OS_CreateTask</span><span class="p">(</span><span class="o">&amp;</span><span class="n">TCB_Producer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Producer&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">ProducerTask</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">Stack_Producer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">Stack_Producer</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">OS_CreateTask</span><span class="p">(</span><span class="o">&amp;</span><span class="n">TCB_Consumer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Consumer&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">ConsumerTask</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">Stack_Consumer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">Stack_Consumer</span><span class="p">),</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">OS_Start</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>✗ Not calling OS_Init() and OS_InitHW()
+✗ Forgetting OS_EnterInterrupt()/OS_LeaveInterrupt() in ISRs
+✗ Using blocking calls from ISR
+✗ Insufficient stack size (check with OS_GetStackUsed())
+✗ Priority 1 is highest user priority (0 is system)
+✗ Not matching mailbox message size
+✗ Using OS_DELAY(0) expecting yield (use OS_Yield())
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Generic RTOS concepts</p></li>
+<li><p><a class="reference internal" href="../days/day15.html"><span class="doc">Day 15 - embOS</span></a> - embOS deep dive</p></li>
+<li><p>Official embOS documentation: segger.com/embos</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cheatsheets/embos_cheatsheet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

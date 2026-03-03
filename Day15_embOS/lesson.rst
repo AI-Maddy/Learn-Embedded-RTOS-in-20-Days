@@ -1,0 +1,1 @@
+Day 15 Lesson - embOS\n===================\n\nCommercial RTOS by SEGGER with excellent tooling integration. Known for: Zero interrupt latency, round-robin scheduling, comprehensive middleware.

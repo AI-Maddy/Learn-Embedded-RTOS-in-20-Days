@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Day 01 - Intro to RTOS &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Day 02 - Tasks and Threads" href="day02.html" />
+    <link rel="prev" title="Daily Learning Path" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="day-01-intro-to-rtos">
+<h1>Day 01 - Intro to RTOS<a class="headerlink" href="#day-01-intro-to-rtos" title="Link to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="id1">
+<h1>Day 01 - Intro to RTOS<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<section id="focus">
+<h2>Focus<a class="headerlink" href="#focus" title="Link to this heading">¶</a></h2>
+<p>This day concentrates on why an RTOS is used, core kernel pieces, and determinism basics.</p>
+</section>
+<section id="learning-objectives">
+<h2>Learning Objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Understand the core concept and where it appears in embedded products.</p></li>
+<li><p>Build or reason about one practical implementation pattern.</p></li>
+<li><p>Identify failure modes and prevention checks for production firmware.</p></li>
+</ul>
+</section>
+<section id="deliverables">
+<h2>Deliverables<a class="headerlink" href="#deliverables" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Concept notes in <code class="docutils literal notranslate"><span class="pre">lesson.rst</span></code>.</p></li>
+<li><p>Practice problems in <code class="docutils literal notranslate"><span class="pre">exercises.rst</span></code>.</p></li>
+<li><p>Guided answer strategy in <code class="docutils literal notranslate"><span class="pre">solutions.rst</span></code>.</p></li>
+</ul>
+</section>
+<section id="definition-of-done">
+<h2>Definition of Done<a class="headerlink" href="#definition-of-done" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>You can explain the concept without notes.</p></li>
+<li><p>You can map the concept to at least one real product scenario.</p></li>
+<li><p>You can list at least three verification checks for correctness.</p></li>
+</ul>
+</section>
+<section id="lesson">
+<h2>Lesson<a class="headerlink" href="#lesson" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-01-lesson-introduction-to-real-time-operating-systems">
+<h1>Day 01 Lesson - Introduction to Real-Time Operating Systems<a class="headerlink" href="#day-01-lesson-introduction-to-real-time-operating-systems" title="Link to this heading">¶</a></h1>
+<section id="what-is-an-rtos">
+<h2>What is an RTOS?<a class="headerlink" href="#what-is-an-rtos" title="Link to this heading">¶</a></h2>
+<p>A <strong>Real-Time Operating System (RTOS)</strong> is a specialized operating system designed for embedded systems that must respond to events within guaranteed time constraints. Unlike general-purpose operating systems (like Linux or Windows), an RTOS prioritizes <strong>determinism</strong> and <strong>predictability</strong> over throughput.</p>
+<p><strong>Key Characteristics:</strong></p>
+<ul class="simple">
+<li><p><strong>Deterministic Scheduling</strong>: Tasks execute in predictable order based on priority</p></li>
+<li><p><strong>Low Latency</strong>: Minimal delay between event occurrence and response</p></li>
+<li><p><strong>Preemption</strong>: Higher-priority tasks can interrupt lower-priority ones immediately</p></li>
+<li><p><strong>Small Footprint</strong>: Designed for resource-constrained environments (KB of RAM/ROM)</p></li>
+<li><p><strong>Hard Real-Time Guarantees</strong>: Deadlines must be met; missing them is system failure</p></li>
+</ul>
+</section>
+<section id="why-use-an-rtos">
+<h2>Why Use an RTOS?<a class="headerlink" href="#why-use-an-rtos" title="Link to this heading">¶</a></h2>
+<p><strong>Bare-Metal vs. RTOS Trade-offs:</strong></p>
+<p>Bare-metal firmware (super-loop architecture):</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Typical bare-metal super-loop</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">hardware_init</span><span class="p">();</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">check_uart</span><span class="p">();</span>
+<span class="w">        </span><span class="n">read_sensors</span><span class="p">();</span>
+<span class="w">        </span><span class="n">update_display</span><span class="p">();</span>
+<span class="w">        </span><span class="n">process_commands</span><span class="p">();</span>
+<span class="w">        </span><span class="c1">// Everything sequential, no priority</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Problems:</strong></p>
+<ul class="simple">
+<li><p>All tasks share one execution flow</p></li>
+<li><p>High-priority urgent events must wait for low-priority work</p></li>
+<li><p>Complex state machines needed for concurrent activities</p></li>
+<li><p>Difficult to reason about timing</p></li>
+</ul>
+<p><strong>RTOS Solution:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// RTOS approach with task priorities</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">uart_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">      </span><span class="c1">// Priority: HIGH</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">wait_for_uart_event</span><span class="p">();</span>
+<span class="w">        </span><span class="n">process_urgent_command</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">sensor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">    </span><span class="c1">// Priority: MEDIUM</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">read_sensors</span><span class="p">();</span>
+<span class="w">        </span><span class="n">delay</span><span class="p">(</span><span class="mi">100</span><span class="n">ms</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">display_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">   </span><span class="c1">// Priority: LOW</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">update_display</span><span class="p">();</span>
+<span class="w">        </span><span class="n">delay</span><span class="p">(</span><span class="mi">500</span><span class="n">ms</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Benefits:</strong></p>
+<ul class="simple">
+<li><p>Urgent UART commands preempt display updates</p></li>
+<li><p>Each task maintains its own stack and state</p></li>
+<li><p>Cleaner code with implicit priority management</p></li>
+<li><p>Scheduler handles timing and context switching</p></li>
+</ul>
+</section>
+<section id="core-rtos-concepts">
+<h2>Core RTOS Concepts<a class="headerlink" href="#core-rtos-concepts" title="Link to this heading">¶</a></h2>
+<section id="tasks-threads">
+<h3>1. Tasks (Threads)<a class="headerlink" href="#tasks-threads" title="Link to this heading">¶</a></h3>
+<p>A task is an independent execution context with its own:</p>
+<ul class="simple">
+<li><p><strong>Program counter (PC)</strong>: Current instruction address</p></li>
+<li><p><strong>Stack</strong>: Local variables and return addresses</p></li>
+<li><p><strong>Priority</strong>: Determines scheduling order</p></li>
+<li><p><strong>State</strong>: Running, Ready, Blocked, or Suspended</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">task_handle</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">my_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">local_var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Stored on task&#39;s private stack</span>
+
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Task body runs forever</span>
+<span class="w">        </span><span class="n">do_work</span><span class="p">();</span>
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span><span class="w">  </span><span class="c1">// Yield CPU for 100ms</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Create task with 512-byte stack, priority 2</span>
+<span class="n">xTaskCreate</span><span class="p">(</span><span class="n">my_task</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;MyTask&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">task_handle</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="scheduler">
+<h3>2. Scheduler<a class="headerlink" href="#scheduler" title="Link to this heading">¶</a></h3>
+<p>The <strong>scheduler</strong> decides which ready task runs next based on:</p>
+<ul class="simple">
+<li><p><strong>Priority-based</strong>: Highest-priority ready task always runs (preemptive)</p></li>
+<li><p><strong>Round-robin</strong>: Equal-priority tasks share CPU time slices</p></li>
+<li><p><strong>Cooperative</strong>: Tasks must explicitly yield (rare in modern RTOS)</p></li>
+</ul>
+<p><strong>Scheduling Algorithm (Simplified):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>while(system_running) {
+    highest_priority_task = find_highest_ready();
+    if (current_task != highest_priority_task) {
+        save_context(current_task);
+        restore_context(highest_priority_task);
+        current_task = highest_priority_task;
+    }
+    run_task_until_blocked_or_preempted();
+}
+</pre></div>
+</div>
+</section>
+<section id="context-switching">
+<h3>3. Context Switching<a class="headerlink" href="#context-switching" title="Link to this heading">¶</a></h3>
+<p><strong>Context switch</strong> is the process of saving one task’s state and restoring another’s.</p>
+<p><strong>What gets saved/restored:</strong></p>
+<ul class="simple">
+<li><p>CPU registers (R0-R15 on ARM Cortex-M)</p></li>
+<li><p>Stack pointer</p></li>
+<li><p>Program counter</p></li>
+<li><p>Status flags</p></li>
+</ul>
+<p><strong>Cost</strong>: Typically 10-50 CPU cycles on modern MCUs (e.g., ~1-2 μs on Cortex-M4 &#64; 80MHz)</p>
+</section>
+<section id="determinism">
+<h3>4. Determinism<a class="headerlink" href="#determinism" title="Link to this heading">¶</a></h3>
+<p><strong>Determinism</strong> means the system’s behavior is predictable and repeatable.</p>
+<p><strong>Key Principles:</strong></p>
+<ul class="simple">
+<li><p><strong>Bounded Execution Time</strong>: Every operation has known maximum duration</p></li>
+<li><p><strong>Priority Inheritance</strong>: Prevents priority inversion (covered Day 5)</p></li>
+<li><p><strong>No Unbounded Loops</strong>: Always have exit conditions</p></li>
+<li><p><strong>Interrupt Management</strong>: Minimize ISR duration, defer work to tasks</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// BAD: Unbounded loop</span>
+<span class="k">while</span><span class="p">(</span><span class="n">uart_data_available</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">process_byte</span><span class="p">();</span><span class="w">  </span><span class="c1">// Could run forever if data streams continuously</span>
+<span class="p">}</span>
+
+<span class="c1">// GOOD: Bounded burst processing</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">while</span><span class="p">(</span><span class="n">uart_data_available</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">MAX_BURST</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">process_byte</span><span class="p">();</span>
+<span class="w">    </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="real-world-rtos-applications">
+<h2>Real-World RTOS Applications<a class="headerlink" href="#real-world-rtos-applications" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Medical Devices</strong>
+- Pacemakers, insulin pumps (hard real-time)
+- Missing deadline = patient harm</p></li>
+<li><p><strong>Automotive</strong>
+- Engine control units (ECU), anti-lock braking (ABS)
+- Response time: sub-millisecond</p></li>
+<li><p><strong>Industrial Automation</strong>
+- PLCs, robotics, motor control
+- Coordinating multiple sensors/actuators</p></li>
+<li><p><strong>Aerospace</strong>
+- Flight control systems, avionics
+- Certification (DO-178C) requires RTOS</p></li>
+<li><p><strong>Consumer Electronics</strong>
+- Smartwatches, IoT devices, drones
+- Power efficiency + responsiveness</p></li>
+</ol>
+</section>
+<section id="common-rtos-options">
+<h2>Common RTOS Options<a class="headerlink" href="#common-rtos-options" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 20.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>RTOS</p></th>
+<th class="head"><p>License</p></th>
+<th class="head"><p>Footprint</p></th>
+<th class="head"><p>Use Cases</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>FreeRTOS</p></td>
+<td><p>MIT</p></td>
+<td><p>~10KB</p></td>
+<td><p>Most popular, AWS IoT integration</p></td>
+</tr>
+<tr class="row-odd"><td><p>Zephyr</p></td>
+<td><p>Apache 2.0</p></td>
+<td><p>~20KB+</p></td>
+<td><p>Modern, BLE/networking rich</p></td>
+</tr>
+<tr class="row-even"><td><p>ThreadX</p></td>
+<td><p>MIT</p></td>
+<td><p>~6KB</p></td>
+<td><p>Certified (IEC 61508, ISO 26262)</p></td>
+</tr>
+<tr class="row-odd"><td><p>ChibiOS</p></td>
+<td><p>GPL/Commercial</p></td>
+<td><p>~12KB</p></td>
+<td><p>High performance, HAL included</p></td>
+</tr>
+<tr class="row-even"><td><p>embOS</p></td>
+<td><p>Commercial</p></td>
+<td><p>~4KB</p></td>
+<td><p>Ultra-compact, automotive-grade</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="your-first-rtos-program">
+<h2>Your First RTOS Program<a class="headerlink" href="#your-first-rtos-program" title="Link to this heading">¶</a></h2>
+<p><strong>Minimal FreeRTOS Example (ARM Cortex-M):</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;FreeRTOS.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;task.h&quot;</span>
+
+<span class="c1">// LED blink task (Priority 1)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vLEDTask</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xLastWakeTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">GPIO_ToggleLED</span><span class="p">();</span>
+<span class="w">        </span><span class="c1">// Precise 500ms delay (maintains period even if task delayed)</span>
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">xLastWakeTime</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">500</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// UART monitor task (Priority 2 - higher)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vUARTTask</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">buffer</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Block until data available (yields CPU to lower priority tasks)</span>
+<span class="w">        </span><span class="n">UART_Receive</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;CRITICAL&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">handle_critical_command</span><span class="p">();</span><span class="w">  </span><span class="c1">// Preempts LED task if needed</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">SystemClock_Config</span><span class="p">();</span>
+<span class="w">    </span><span class="n">GPIO_Init</span><span class="p">();</span>
+<span class="w">    </span><span class="n">UART_Init</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Create tasks</span>
+<span class="w">    </span><span class="n">xTaskCreate</span><span class="p">(</span><span class="n">vLEDTask</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;LED&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">    </span><span class="n">xTaskCreate</span><span class="p">(</span><span class="n">vUARTTask</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;UART&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Start scheduler (never returns)</span>
+<span class="w">    </span><span class="n">vTaskStartScheduler</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Should never reach here</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Execution Flow:</strong></p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">main()</span></code> creates tasks (both start in Ready state)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vTaskStartScheduler()</span></code> starts RTOS</p></li>
+<li><p><strong>UART task runs</strong> (priority 2 &gt; 1), blocks waiting for data</p></li>
+<li><p><strong>LED task runs</strong> (only ready task), toggles LED, delays</p></li>
+<li><p>When UART data arrives, <strong>UART task preempts</strong> LED task immediately</p></li>
+<li><p>After UART processing, LED task resumes where it left off</p></li>
+</ol>
+</section>
+<section id="key-takeaways">
+<h2>Key Takeaways<a class="headerlink" href="#key-takeaways" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>RTOS provides structure</strong> for managing concurrent activities with priorities</p></li>
+<li><p><strong>Determinism is critical</strong> for real-time systems (predictable timing)</p></li>
+<li><p><strong>Preemption enables responsiveness</strong> - urgent tasks run immediately</p></li>
+<li><p><strong>Overhead is minimal</strong> (context switch &lt; 2 μs on modern MCUs)</p></li>
+<li><p><strong>Use RTOS when</strong>:
+- Multiple concurrent activities with different urgencies
+- Hard timing requirements
+- Complex state management becomes unwieldy</p></li>
+</ol>
+<p><strong>Next Steps:</strong></p>
+<p>Tomorrow (Day 02) we’ll dive deep into task creation, priorities, and stack management.</p>
+</section>
+<section id="exercises">
+<h2>Exercises<a class="headerlink" href="#exercises" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-01-exercises-introduction-to-rtos">
+<h1>Day 01 Exercises - Introduction to RTOS<a class="headerlink" href="#day-01-exercises-introduction-to-rtos" title="Link to this heading">¶</a></h1>
+<section id="exercise-1-concept-check-bare-metal-vs-rtos">
+<h2>Exercise 1 - Concept Check: Bare-Metal vs. RTOS<a class="headerlink" href="#exercise-1-concept-check-bare-metal-vs-rtos" title="Link to this heading">¶</a></h2>
+<section id="objective">
+<h3>Objective<a class="headerlink" href="#objective" title="Link to this heading">¶</a></h3>
+<p>Understand when an RTOS is beneficial compared to bare-metal firmware.</p>
+</section>
+<section id="scenario">
+<h3>Scenario<a class="headerlink" href="#scenario" title="Link to this heading">¶</a></h3>
+<p>You’re designing firmware for a smart thermostat with these requirements:</p>
+<ul class="simple">
+<li><p>Read temperature sensor every 100ms</p></li>
+<li><p>Check motion detector for occupancy (irregular timing)</p></li>
+<li><p>Update LCD display every 500ms</p></li>
+<li><p>Handle button presses (immediate response required)</p></li>
+<li><p>Communicate with Wi-Fi module (variable duration, 50-200ms)</p></li>
+</ul>
+</section>
+<section id="tasks">
+<h3>Tasks<a class="headerlink" href="#tasks" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Bare-Metal Analysis</strong>: Sketch a super-loop implementation. Identify the main challenge in handling urgent button presses.</p></li>
+<li><p><strong>RTOS Analysis</strong>: Design a task structure for an RTOS solution. Assign priorities (1=low, 3=high) with justification.</p></li>
+<li><p><strong>Timing Analysis</strong>: Calculate the worst-case response time for a button press in both approaches, assuming:
+- Temperature read: 1ms
+- LCD update: 10ms
+- Wi-Fi communication: 200ms (max)
+- Button handler: 2ms</p></li>
+</ol>
+</section>
+<section id="expected-output">
+<h3>Expected Output<a class="headerlink" href="#expected-output" title="Link to this heading">¶</a></h3>
+<p>A comparison table showing:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 35.0%" />
+<col style="width: 35.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Metric</p></th>
+<th class="head"><p>Bare-Metal</p></th>
+<th class="head"><p>RTOS</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Worst-case button response</p></td>
+<td><p>??? ms (calculate)</p></td>
+<td><p>??? ms (calculate)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Code complexity</p></td>
+<td><p>(your assessment)</p></td>
+<td><p>(your assessment)</p></td>
+</tr>
+<tr class="row-even"><td><p>Memory overhead</p></td>
+<td><p>(estimate)</p></td>
+<td><p>(estimate)</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bonus</strong>: Identify one failure mode that RTOS makes easier to prevent.</p>
+</section>
+</section>
+<section id="exercise-2-code-review-critical-bugs">
+<h2>Exercise 2 - Code Review: Critical Bugs<a class="headerlink" href="#exercise-2-code-review-critical-bugs" title="Link to this heading">¶</a></h2>
+<section id="id2">
+<h3>Objective<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>Identify common mistakes in early RTOS code that violate determinism.</p>
+</section>
+<section id="buggy-code">
+<h3>Buggy Code<a class="headerlink" href="#buggy-code" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Task 1: Process incoming packets</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">packet_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">buffer</span><span class="p">[</span><span class="mi">512</span><span class="p">];</span>
+
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for packet</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">receive_packet</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="n">TIMEOUT_FOREVER</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Process all data in packet</span>
+<span class="w">            </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">get_packet_length</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">process_byte</span><span class="p">(</span><span class="n">buffer</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span><span class="w">  </span><span class="c1">// Takes 10-50ms per byte</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Task 2: Critical safety monitor</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">safety_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">read_pressure_sensor</span><span class="p">();</span>
+
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">pressure</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">CRITICAL_THRESHOLD</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">emergency_shutdown</span><span class="p">();</span><span class="w">  </span><span class="c1">// MUST run within 10ms of detection</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">5</span><span class="p">));</span><span class="w">  </span><span class="c1">// Check every 5ms</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Task 3: Logging task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">log_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_next_log_message</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Write to SD card</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">sd_card_ready</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Spin-wait for SD card</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">sd_card_write</span><span class="p">(</span><span class="n">msg</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h3>Tasks<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Identify 3-5 bugs</strong> that could violate timing requirements or cause system failures.</p></li>
+<li><p><strong>For each bug</strong>, explain:
+- What goes wrong under what conditions?
+- What real-time principle is violated?
+- How to fix it?</p></li>
+<li><p><strong>Priority Assignment</strong>: If Task 1 has priority 2, what priorities should Tasks 2 and 3 have? Justify your answer.</p></li>
+</ol>
+</section>
+<section id="id4">
+<h3>Expected Output<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<p>A bug report table:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Bug #1: [Bug description]
+Location: [Task name, line description]
+Failure Scenario: [When does this fail?]
+Fix: [Specific code change]
+
+Bug #2: ...
+</pre></div>
+</div>
+</section>
+</section>
+<section id="exercise-3-design-practice-multi-task-system">
+<h2>Exercise 3 - Design Practice: Multi-Task System<a class="headerlink" href="#exercise-3-design-practice-multi-task-system" title="Link to this heading">¶</a></h2>
+<section id="id5">
+<h3>Objective<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<p>Design a multi-task RTOS system from scratch with proper synchronization.</p>
+</section>
+<section id="id6">
+<h3>Scenario<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<p>Design firmware for a <strong>data logger</strong> that:</p>
+<ul class="simple">
+<li><p><strong>Samples 4 ADC channels</strong> at 100 Hz (every 10ms, all channels)</p></li>
+<li><p><strong>Writes data to SD card</strong> in batches of 100 samples (avoid SD wear)</p></li>
+<li><p><strong>Monitors USB port</strong> for commands: “START”, “STOP”, “STATUS”</p></li>
+<li><p><strong>Blinks status LED</strong>:
+- Slow (1 Hz) = idle
+- Fast (5 Hz) = logging
+- Off = error</p></li>
+</ul>
+<p><strong>Hard Requirements:</strong></p>
+<ul class="simple">
+<li><p>ADC sampling timing jitter &lt; 1ms (strict timing)</p></li>
+<li><p>USB commands must respond within 50ms</p></li>
+<li><p>SD write must not block ADC sampling</p></li>
+<li><p>Handle SD card errors gracefully (full card, removed card)</p></li>
+</ul>
+</section>
+<section id="id7">
+<h3>Tasks<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Task Decomposition</strong>: Define 3-5 tasks with:
+- Task name and purpose
+- Priority (1=low, 5=high)
+- Stack size estimate
+- Timing requirements</p></li>
+<li><p><strong>Communication Design</strong>: Choose IPC mechanism(s) for:
+- Passing ADC samples to SD writer
+- Sending commands from USB task to ADC task
+- Notifying LED task of state changes</p></li>
+<li><p><strong>Error Handling</strong>: Define behavior when:
+- SD card is full (can’t write)
+- ADC sampling overruns (missed deadline)
+- USB command arrives while SD writing</p></li>
+<li><p><strong>Validation Plan</strong>: How will you verify the 1ms jitter requirement in production?</p></li>
+</ol>
+</section>
+<section id="id8">
+<h3>Expected Output<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<p>A design document including:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>** Task Architecture **
+
+Task 1: ADC Sampler
+- Priority: 5 (highest - hard real-time)
+- Stack: 256 bytes
+- Period: 10ms (100 Hz)
+- IPC: Writes to circular buffer (lock-free)
+
+Task 2: ...
+
+** Communication **
+
+ADC → SD: Circular buffer (1000 samples capacity)
+USB → Control: Queue for commands
+...
+
+** Error Scenarios **
+
+1. SD Full:
+   - Action: Stop writing, keep latest 1000 samples in RAM
+   - LED: Blink error pattern
+   - USB: Report &quot;MEMORY_FULL&quot; status
+...
+
+** Verification **
+
+- Use GPIO toggle + oscilloscope to measure ADC task jitter
+- Log timestamp deltas: assert(delta &lt; 11ms)
+...
+</pre></div>
+</div>
+</section>
+</section>
+<section id="exercise-4-timing-analysis-challenge-advanced">
+<h2>Exercise 4 - Timing Analysis Challenge (Advanced)<a class="headerlink" href="#exercise-4-timing-analysis-challenge-advanced" title="Link to this heading">¶</a></h2>
+<section id="id9">
+<h3>Objective<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<p>Perform worst-case execution time (WCET) analysis.</p>
+</section>
+<section id="system-details">
+<h3>System Details<a class="headerlink" href="#system-details" title="Link to this heading">¶</a></h3>
+<p>Three tasks on a system with preemptive priority scheduling:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Task</p></th>
+<th class="head"><p>Priority</p></th>
+<th class="head"><p>Execution Time</p></th>
+<th class="head"><p>Period</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Task A (Control)</p></td>
+<td><p>3 (High)</p></td>
+<td><p>2 ms</p></td>
+<td><p>10 ms</p></td>
+</tr>
+<tr class="row-odd"><td><p>Task B (Processing)</p></td>
+<td><p>2 (Medium)</p></td>
+<td><p>5 ms</p></td>
+<td><p>20 ms</p></td>
+</tr>
+<tr class="row-even"><td><p>Task C (Logging)</p></td>
+<td><p>1 (Low)</p></td>
+<td><p>8 ms</p></td>
+<td><p>50 ms</p></td>
+</tr>
+</tbody>
+</table>
+<p>Context switch overhead: 0.01 ms (10 μs)</p>
+</section>
+<section id="id10">
+<h3>Tasks<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Calculate CPU utilization</strong>: Is this system schedulable? (Rule: U &lt; 100%)</p></li>
+<li><p><strong>Worst-case response time for Task B</strong>: Consider:
+- Task B starts executing
+- Task A preempts it (how many times within 20ms?)
+- Include context switch overhead</p></li>
+<li><p><strong>Priority Inversion scenario</strong>: Task C runs and acquires a mutex that Task A later needs. Calculate the blocking time if:
+- Task C holds mutex for 1ms max
+- Task B preempts Task C while mutex held</p></li>
+<li><p><strong>Design Rule</strong>: What’s the maximum execution time you’d allow for a new Task D (priority 2, period 100ms) while maintaining U &lt; 80% (safety margin)?</p></li>
+</ol>
+</section>
+<section id="id11">
+<h3>Expected Output<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>** CPU Utilization **
+U = (2/10) + (5/20) + (8/50) = ____%
+Schedulable: YES/NO
+
+** Task B Response Time **
+- Base execution: 5ms
+- Task A preemptions: ___ times × 2ms = ___ ms
+- Context switches: ___ times × 0.01ms = ___ ms
+- Total WCRT: ___ ms
+- Meets deadline (20ms)?: YES/NO
+
+** Priority Inversion **
+Max blocking for Task A: ___ ms
+Explain scenario: ...
+
+** New Task D **
+Max execution time: ___ ms
+Calculation: ...
+</pre></div>
+</div>
+<p><strong>Bonus</strong>: Research “Rate Monotonic Analysis” and check if priority assignments are optimal.</p>
+</section>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p>These exercises cover:</p>
+<ol class="arabic simple">
+<li><p><strong>When to use RTOS</strong> (bare-metal comparison)</p></li>
+<li><p><strong>Identifying real-time bugs</strong> (code review)</p></li>
+<li><p><strong>System design skills</strong> (task decomposition, IPC, error handling)</p></li>
+<li><p><strong>Timing analysis</strong> (schedulability, WCET, response time)</p></li>
+</ol>
+<p>After completing these, you should be able to:</p>
+<ul class="simple">
+<li><p>Justify RTOS adoption for a project</p></li>
+<li><p>Spot common timing violations</p></li>
+<li><p>Design a multi-task system architecture</p></li>
+<li><p>Perform basic schedulability analysis</p></li>
+</ul>
+<p><strong>Solutions and deeper explanations in ``solutions.rst``</strong>.</p>
+</section>
+<section id="solutions">
+<h2>Solutions<a class="headerlink" href="#solutions" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-01-solutions-introduction-to-rtos">
+<h1>Day 01 Solutions - Introduction to RTOS<a class="headerlink" href="#day-01-solutions-introduction-to-rtos" title="Link to this heading">¶</a></h1>
+<section id="solution-1-bare-metal-vs-rtos-analysis">
+<h2>Solution 1 - Bare-Metal vs. RTOS Analysis<a class="headerlink" href="#solution-1-bare-metal-vs-rtos-analysis" title="Link to this heading">¶</a></h2>
+<section id="part-1-bare-metal-super-loop">
+<h3>Part 1: Bare-Metal Super-Loop<a class="headerlink" href="#part-1-bare-metal-super-loop" title="Link to this heading">¶</a></h3>
+<p><strong>Typical Implementation:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">hw_init</span><span class="p">();</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Sequential execution</span>
+<span class="w">        </span><span class="n">read_temperature</span><span class="p">();</span><span class="w">        </span><span class="c1">// 1ms</span>
+<span class="w">        </span><span class="n">check_motion_detector</span><span class="p">();</span><span class="w">   </span><span class="c1">// &lt;1ms (if no motion)</span>
+<span class="w">        </span><span class="n">update_lcd</span><span class="p">();</span><span class="w">              </span><span class="c1">// 10ms</span>
+<span class="w">        </span><span class="n">check_button_press</span><span class="p">();</span><span class="w">      </span><span class="c1">// &lt;1ms (if not pressed)</span>
+<span class="w">        </span><span class="n">handle_wifi</span><span class="p">();</span><span class="w">             </span><span class="c1">// 50-200ms variable!</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Main Challenge</strong>: Button press responsiveness depends on where in the loop it occurs.</p>
+<p><strong>Worst-Case Response Time Calculation:</strong></p>
+<p>Assume button pressed right after <code class="docutils literal notranslate"><span class="pre">check_button_press()</span></code> completes:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Wait time = rest of loop
+= handle_wifi(max) + read_temperature + check_motion + update_lcd + check_button
+= 200ms + 1ms + 1ms + 10ms + 1ms
+= 213 ms worst case
+
+In best case (button pressed just before check): ~1ms
+</pre></div>
+</div>
+<p><strong>Problem</strong>: 213ms is too slow for good UI responsiveness (humans notice &gt;100ms).</p>
+</section>
+<section id="part-2-rtos-task-structure">
+<h3>Part 2: RTOS Task Structure<a class="headerlink" href="#part-2-rtos-task-structure" title="Link to this heading">¶</a></h3>
+<p><strong>Task Design:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Task Name</p></th>
+<th class="head"><p>Priority</p></th>
+<th class="head"><p>Justification</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Button Handler</p></td>
+<td><p>3 (High)</p></td>
+<td><p>User interaction requires immediate feedback (&lt;50ms)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Motion Detector</p></td>
+<td><p>3 (High)</p></td>
+<td><p>Security/energy feature, time-sensitive</p></td>
+</tr>
+<tr class="row-even"><td><p>Temperature Sampler</p></td>
+<td><p>2 (Medium)</p></td>
+<td><p>Periodic but not critical</p></td>
+</tr>
+<tr class="row-odd"><td><p>Wi-Fi Communications</p></td>
+<td><p>2 (Medium)</p></td>
+<td><p>Important but can tolerate delays</p></td>
+</tr>
+<tr class="row-even"><td><p>LCD Update</p></td>
+<td><p>1 (Low)</p></td>
+<td><p>Cosmetic, no timing criticality</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>RTOS Implementation Sketch:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">button_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// Priority 3</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">wait_for_button_interrupt</span><span class="p">();</span><span class="w">  </span><span class="c1">// Blocked until press</span>
+<span class="w">        </span><span class="n">handle_button</span><span class="p">();</span><span class="w">              </span><span class="c1">// 2ms</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">wifi_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// Priority 2</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">wifi_communicate</span><span class="p">();</span><span class="w">  </span><span class="c1">// 50-200ms</span>
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span><span class="w">  </span><span class="c1">// 1Hz rate</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">lcd_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// Priority 1</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">update_lcd</span><span class="p">();</span><span class="w">  </span><span class="c1">// 10ms</span>
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">500</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>RTOS Worst-Case Response Time:</strong></p>
+<p>When button ISR occurs:</p>
+<ol class="arabic simple">
+<li><p>ISR sets event → wakes button_task</p></li>
+<li><p>If Wi-Fi task running (priority 2), it’s preempted immediately</p></li>
+<li><p>Button task runs (priority 3 &gt; all others)</p></li>
+</ol>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Response time = ISR latency + context switch + button handler
+= ~5μs + ~1μs + 2ms
+≈ 2.01 ms
+
+Even if Wi-Fi is mid-communication, it&#39;s preempted!
+</pre></div>
+</div>
+<p><strong>Comparison Table:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 35.0%" />
+<col style="width: 35.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Metric</p></th>
+<th class="head"><p>Bare-Metal</p></th>
+<th class="head"><p>RTOS</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Worst-case button response</p></td>
+<td><p>213 ms</p></td>
+<td><p>~2 ms</p></td>
+</tr>
+<tr class="row-odd"><td><p>Code complexity</p></td>
+<td><p>All in one function; manual state machines for concurrency</p></td>
+<td><p>Distributed across tasks; simpler per-task logic</p></td>
+</tr>
+<tr class="row-even"><td><p>Memory overhead</p></td>
+<td><p>~1KB (single stack)</p></td>
+<td><p>~6KB (5 tasks × 512B stack + kernel)</p></td>
+</tr>
+<tr class="row-odd"><td><p>CPU utilization</p></td>
+<td><p>Lower (polling wastes cycles)</p></td>
+<td><p>Higher (sleep when idle)</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bonus - Failure Mode Prevention:</strong></p>
+<p><strong>Stack overflow</strong>: Bare-metal has one stack—overflow corrupts globals silently. RTOS isolates each task’s stack; overflow detected via guard patterns (<code class="docutils literal notranslate"><span class="pre">vApplicationStackOverflowHook</span></code>).</p>
+</section>
+</section>
+<section id="solution-2-code-review-critical-bugs">
+<h2>Solution 2 - Code Review: Critical Bugs<a class="headerlink" href="#solution-2-code-review-critical-bugs" title="Link to this heading">¶</a></h2>
+<section id="bug-1-unbounded-loop-in-packet-task">
+<h3>Bug #1: Unbounded Loop in packet_task<a class="headerlink" href="#bug-1-unbounded-loop-in-packet-task" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">get_packet_length</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">process_byte</span><span class="p">(</span><span class="n">buffer</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span><span class="w">  </span><span class="c1">// 10-50ms per byte!</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Problem</strong>: If packet length is 512 bytes × 50ms/byte = <strong>25.6 seconds</strong> max!
+Safety task (priority unknown) might not run for 25 seconds → emergency_shutdown delayed.</p>
+<p><strong>Real-Time Principle Violated</strong>: <strong>Bounded execution time</strong>.</p>
+<p><strong>Fix</strong>: Process in chunks with yield points:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">while</span><span class="p">(</span><span class="n">offset</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">get_packet_length</span><span class="p">(</span><span class="n">buffer</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">chunk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">min</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">get_packet_length</span><span class="p">(</span><span class="n">buffer</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">offset</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">chunk</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">process_byte</span><span class="p">(</span><span class="n">buffer</span><span class="p">[</span><span class="n">offset</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">offset</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">chunk</span><span class="p">;</span>
+<span class="w">    </span><span class="n">taskYIELD</span><span class="p">();</span><span class="w">  </span><span class="c1">// Allow higher-priority tasks to run</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="bug-2-priority-inversion-risk">
+<h3>Bug #2: Priority Inversion Risk<a class="headerlink" href="#bug-2-priority-inversion-risk" title="Link to this heading">¶</a></h3>
+<p>Safety task must run within 10ms but might be blocked if packet_task holds a shared resource.</p>
+<p><strong>Problem</strong>: If both tasks access shared data (e.g., sensor calibration table) without priority inheritance, packet_task at lower priority could block safety_task.</p>
+<p><strong>Fix</strong>:
+- Use mutex with priority inheritance: <code class="docutils literal notranslate"><span class="pre">xSemaphoreCreateMutex()</span></code>
+- Or redesign to avoid shared mutable state</p>
+</section>
+<section id="bug-3-spin-wait-in-log-task">
+<h3>Bug #3: Spin-Wait in log_task<a class="headerlink" href="#bug-3-spin-wait-in-log-task" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">while</span><span class="p">(</span><span class="o">!</span><span class="n">sd_card_ready</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Spin-wait for SD card</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Problem</strong>: Wastes CPU while SD card is busy (could be 10-100ms). Task holds CPU even though it can’t make progress → blocks lower-priority tasks needlessly.</p>
+<p><strong>Fix</strong>: Block on SD card ready event using semaphore:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">sd_ready_semaphore</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="n">sd_card_write</span><span class="p">(</span><span class="n">msg</span><span class="p">);</span>
+
+<span class="c1">// In SD card ISR:</span>
+<span class="n">xSemaphoreGiveFromISR</span><span class="p">(</span><span class="n">sd_ready_semaphore</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="bug-4-missing-delay-in-log-task-loop">
+<h3>Bug #4: Missing Delay in log_task Loop<a class="headerlink" href="#bug-4-missing-delay-in-log-task-loop" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_next_log_message</span><span class="p">();</span>
+<span class="w">    </span><span class="c1">// No yield if no message!</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Problem</strong>: If <code class="docutils literal notranslate"><span class="pre">get_next_log_message()</span></code> returns NULL immediately (no messages), loop spins at 100% CPU → starves lower-priority tasks (if any).</p>
+<p><strong>Fix</strong>: Block on queue with timeout:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">char</span><span class="w"> </span><span class="n">msg</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+<span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">log_queue</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">wait_for_sd_card</span><span class="p">();</span>
+<span class="w">        </span><span class="n">sd_card_write</span><span class="p">(</span><span class="n">msg</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="bug-5-safety-task-false-sense-of-security">
+<h3>Bug #5: Safety Task False Sense of Security<a class="headerlink" href="#bug-5-safety-task-false-sense-of-security" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">5</span><span class="p">));</span><span class="w">  </span><span class="c1">// Check every 5ms</span>
+</pre></div>
+</div>
+<p><strong>Problem</strong>: If safety task misses a check cycle (preempted by long-running packet process), next check is 10ms later. Also, delay is <strong>at least</strong> 5ms, could be 6ms depending on tick timing.</p>
+<p><strong>Fix</strong>: Use <code class="docutils literal notranslate"><span class="pre">vTaskDelayUntil</span></code> for precise timing + increase priority:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">read_pressure_sensor</span><span class="p">();</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="n">pressure</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">CRITICAL_THRESHOLD</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">emergency_shutdown</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">5</span><span class="p">));</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Priority Assignment:</strong></p>
+<p>Given packet_task is priority 2:</p>
+<ul class="simple">
+<li><p><strong>safety_task</strong>: Priority 4-5 (highest) — Must preempt everything</p></li>
+<li><p><strong>packet_task</strong>: Priority 2 (given)</p></li>
+<li><p><strong>log_task</strong>: Priority 1 (lowest) — Not time-critical</p></li>
+</ul>
+<p><strong>Justification</strong>: Safety is hard real-time (life/property risk). Logging is best-effort.</p>
+</section>
+</section>
+<section id="solution-3-data-logger-design">
+<h2>Solution 3 - Data Logger Design<a class="headerlink" href="#solution-3-data-logger-design" title="Link to this heading">¶</a></h2>
+<section id="task-architecture">
+<h3>Task Architecture<a class="headerlink" href="#task-architecture" title="Link to this heading">¶</a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 15.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Task</p></th>
+<th class="head"><p>Priority</p></th>
+<th class="head"><p>Stack</p></th>
+<th class="head"><p>Purpose</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>ADC_Sampler</p></td>
+<td><p>5</p></td>
+<td><p>256B</p></td>
+<td><p>Sample 4 ADC channels every 10ms; write to ring buffer</p></td>
+</tr>
+<tr class="row-odd"><td><p>SD_Writer</p></td>
+<td><p>2</p></td>
+<td><p>1024B</p></td>
+<td><p>Batch 100 samples, write to SD card</p></td>
+</tr>
+<tr class="row-even"><td><p>USB_Command</p></td>
+<td><p>4</p></td>
+<td><p>512B</p></td>
+<td><p>Parse START/STOP/STATUS commands</p></td>
+</tr>
+<tr class="row-odd"><td><p>LED_Blinker</p></td>
+<td><p>1</p></td>
+<td><p>128B</p></td>
+<td><p>Update LED pattern based on system state</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Timing Requirements:</strong></p>
+<ul class="simple">
+<li><p>ADC_Sampler: <strong>10ms period, &lt;1ms jitter</strong> (hard real-time)</p></li>
+<li><p>USB_Command: <strong>&lt;50ms response</strong> (soft real-time)</p></li>
+<li><p>SD_Writer: <strong>No deadline</strong> (best-effort)</p></li>
+<li><p>LED_Blinker: <strong>~100-200ms periods</strong> (cosmetic)</p></li>
+</ul>
+</section>
+<section id="communication-design">
+<h3>Communication Design<a class="headerlink" href="#communication-design" title="Link to this heading">¶</a></h3>
+<p><strong>ADC → SD Writer</strong>: Lock-free circular buffer</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define BUFFER_SIZE 1000</span>
+<span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">adc_sample_t</span><span class="w"> </span><span class="n">samples</span><span class="p">[</span><span class="n">BUFFER_SIZE</span><span class="p">];</span>
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">write_idx</span><span class="p">;</span><span class="w">  </span><span class="c1">// Modified by ADC task only</span>
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">read_idx</span><span class="p">;</span><span class="w">   </span><span class="c1">// Modified by SD task only</span>
+<span class="p">}</span><span class="w"> </span><span class="n">sample_buffer</span><span class="p">;</span>
+
+<span class="c1">// ADC task (producer):</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">adc_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">adc_sample_t</span><span class="w"> </span><span class="n">sample</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_all_channels</span><span class="p">();</span>
+
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">next</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">sample_buffer</span><span class="p">.</span><span class="n">write_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">BUFFER_SIZE</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">next</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">sample_buffer</span><span class="p">.</span><span class="n">read_idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// Not full</span>
+<span class="w">            </span><span class="n">sample_buffer</span><span class="p">.</span><span class="n">samples</span><span class="p">[</span><span class="n">sample_buffer</span><span class="p">.</span><span class="n">write_idx</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sample</span><span class="p">;</span>
+<span class="w">            </span><span class="n">sample_buffer</span><span class="p">.</span><span class="n">write_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">next</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">error_buffer_overrun</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">10</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>USB → Control</strong>: Command queue</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">cmd_queue</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">CMD_START</span><span class="p">,</span><span class="w"> </span><span class="n">CMD_STOP</span><span class="p">,</span><span class="w"> </span><span class="n">CMD_STATUS</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="n">command_t</span><span class="p">;</span>
+
+<span class="c1">// USB task sends:</span>
+<span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parse_usb_input</span><span class="p">();</span>
+<span class="n">xQueueSend</span><span class="p">(</span><span class="n">cmd_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+
+<span class="c1">// ADC/SD tasks check:</span>
+<span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="p">;</span>
+<span class="k">if</span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">cmd_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">handle_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>State → LED</strong>: Event group flags</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">state_events</span><span class="p">;</span>
+<span class="cp">#define STATE_LOGGING   (1 &lt;&lt; 0)</span>
+<span class="cp">#define STATE_ERROR     (1 &lt;&lt; 1)</span>
+
+<span class="c1">// SD task sets:</span>
+<span class="n">xEventGroupSetBits</span><span class="p">(</span><span class="n">state_events</span><span class="p">,</span><span class="w"> </span><span class="n">STATE_LOGGING</span><span class="p">);</span>
+
+<span class="c1">// LED task waits:</span>
+<span class="n">EventBits_t</span><span class="w"> </span><span class="n">bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xEventGroupWaitBits</span><span class="p">(</span><span class="n">state_events</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_LOGGING</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">STATE_ERROR</span><span class="p">,</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">,</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="error-handling">
+<h3>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading">¶</a></h3>
+<p><strong>Scenario 1: SD Card Full</strong></p>
+<ul class="simple">
+<li><p><strong>Detection</strong>: <code class="docutils literal notranslate"><span class="pre">sd_write()</span></code> returns error code</p></li>
+<li><p><strong>Action</strong>:
+1. Stop consuming from ring buffer
+2. Ring buffer reaches capacity → ADC task detects overrun
+3. Set <code class="docutils literal notranslate"><span class="pre">STATE_ERROR</span></code> flag
+4. Respond to STATUS command with “MEMORY_FULL”</p></li>
+<li><p><strong>Recovery</strong>: User sends STOP → system returns to idle</p></li>
+</ul>
+<p><strong>Scenario 2: ADC Sampling Overrun</strong></p>
+<ul class="simple">
+<li><p><strong>Detection</strong>: <code class="docutils literal notranslate"><span class="pre">vTaskDelayUntil</span></code> returns pdFALSE (missed deadline) -OR- ring buffer full</p></li>
+<li><p><strong>Action</strong>:
+1. Increment <code class="docutils literal notranslate"><span class="pre">stats.overruns</span></code> counter
+2. Log timestamp of overrun event
+3. Set error flag (don’t stop sampling)</p></li>
+<li><p><strong>Prevention</strong>:
+- Ensure ADC task priority &gt; all others
+- Minimize ISR duration
+- Increase ring buffer size</p></li>
+</ul>
+<p><strong>Scenario 3: Command During SD Write</strong></p>
+<ul class="simple">
+<li><p><strong>Not a problem</strong>: USB task (priority 4) preempts SD Writer (priority 2) immediately</p></li>
+<li><p>Command processed within &lt;50ms even if SD write takes 500ms</p></li>
+</ul>
+</section>
+<section id="validation-plan">
+<h3>Validation Plan<a class="headerlink" href="#validation-plan" title="Link to this heading">¶</a></h3>
+<p><strong>Jitter Measurement:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">adc_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">expected_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">last_wake</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">actual_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">        </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">jitter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">actual_wake</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">expected_wake</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">portTICK_PERIOD_MS</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">abs</span><span class="p">(</span><span class="n">jitter</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">log_error</span><span class="p">(</span><span class="s">&quot;Jitter violation: %d ms&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">jitter</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// GPIO toggle for oscilloscope measurement:</span>
+<span class="w">        </span><span class="n">GPIO_Toggle</span><span class="p">(</span><span class="n">DEBUG_PIN</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">read_all_channels</span><span class="p">();</span>
+
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">10</span><span class="p">));</span>
+<span class="w">        </span><span class="n">expected_wake</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Production Test</strong>:
+- Oscilloscope on DEBUG_PIN: measure period variation → must be 10.00 ± 0.1ms
+- Stress test: Run for 24 hours, verify stats.overruns == 0</p>
+</section>
+</section>
+<section id="solution-4-timing-analysis-advanced">
+<h2>Solution 4 - Timing Analysis (Advanced)<a class="headerlink" href="#solution-4-timing-analysis-advanced" title="Link to this heading">¶</a></h2>
+<section id="part-1-cpu-utilization">
+<h3>Part 1: CPU Utilization<a class="headerlink" href="#part-1-cpu-utilization" title="Link to this heading">¶</a></h3>
+<div class="math notranslate nohighlight">
+\[U = \sum \frac{C_i}{T_i}\]</div>
+<p>Where $C_i$ = execution time, $T_i$ = period.</p>
+<div class="math notranslate nohighlight">
+\[ \begin{align}\begin{aligned}U = \frac{2}{10} + \frac{5}{20} + \frac{8}{50}\\U = 0.20 + 0.25 + 0.16 = 0.61 = 61\%\end{aligned}\end{align} \]</div>
+<p><strong>Result</strong>: System is schedulable (U &lt; 100%, leaves 39% margin).</p>
+</section>
+<section id="part-2-worst-case-response-time-task-b">
+<h3>Part 2: Worst-Case Response Time (Task B)<a class="headerlink" href="#part-2-worst-case-response-time-task-b" title="Link to this heading">¶</a></h3>
+<p>Task B (priority 2, execution 5ms, period 20ms).</p>
+<p><strong>Analysis window</strong>: 20ms (one period of Task B).</p>
+<p><strong>Interference from higher-priority Task A</strong>:</p>
+<ul class="simple">
+<li><p>Task A: period 10ms, execution 2ms</p></li>
+<li><p>In 20ms, Task A runs <strong>2 times</strong>: at t=0 and t=10ms</p></li>
+</ul>
+<p><strong>Preemptions</strong>:
+- Task B starts at t=0 (worst case: Task A also ready)
+- Task A preempts (2ms) + context switch (0.01ms)
+- Task B resumes, runs until t=10ms
+- Task A preempts again (2ms) + context switch (0.01ms)
+- Task B finishes</p>
+<p><strong>Calculation</strong>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Response Time (Task B) = Execution + Interference
+
+Interference = (Task A executions in 20ms) × (Execution + Context Switch)
+= 2 × (2ms + 0.01ms) = 4.02ms
+
+Total Response Time = 5ms + 4.02ms = 9.02ms
+
+Deadline: 20ms
+Meets deadline?: YES (9.02ms &lt; 20ms)
+</pre></div>
+</div>
+</section>
+<section id="part-3-priority-inversion">
+<h3>Part 3: Priority Inversion<a class="headerlink" href="#part-3-priority-inversion" title="Link to this heading">¶</a></h3>
+<p><strong>Scenario</strong>:</p>
+<ol class="arabic simple">
+<li><p>Task C (priority 1) acquires mutex</p></li>
+<li><p>Task C holds mutex for max 1ms</p></li>
+<li><p>Task B (priority 2) preempts Task C (mutex still held by C)</p></li>
+<li><p>Task B runs its 5ms</p></li>
+<li><p>Task C resumes, holds mutex (1ms remaining)</p></li>
+<li><p>Task A (priority 3) needs the mutex → <strong>blocked by Task C</strong></p></li>
+</ol>
+<p><strong>Blocking Time for Task A</strong>:</p>
+<ul class="simple">
+<li><p>Task C has 1ms of work while holding mutex</p></li>
+<li><p>BUT Task B extended Task C’s blocking period by 5ms!</p></li>
+<li><p>Total blocking = 5ms (Task B) + 1ms (Task C) = <strong>6ms</strong></p></li>
+</ul>
+<p>This is <strong>unbounded priority inversion</strong> (medium-priority task blocks high-priority).</p>
+<p><strong>Fix</strong>: Priority Inheritance Protocol (PIP)</p>
+<ul class="simple">
+<li><p>When Task A blocks on mutex held by Task C:
+- <strong>Boost Task C’s priority to 3</strong> (same as Task A)
+- Task C now preempts Task B
+- Task C finishes mutex section (1ms), releases mutex
+- Task C returns to priority 1
+- Task A acquires mutex</p></li>
+</ul>
+<p><strong>New Blocking Time</strong>: 1ms (only Task C’s critical section)</p>
+</section>
+<section id="part-4-new-task-d-headroom">
+<h3>Part 4: New Task D Headroom<a class="headerlink" href="#part-4-new-task-d-headroom" title="Link to this heading">¶</a></h3>
+<p><strong>Target</strong>: U &lt; 80% (20% safety margin for analysis uncertainty).</p>
+<p>Current: U = 61%
+Available: 80% - 61% = 19%</p>
+<p>Task D: Priority 2, period 100ms</p>
+<div class="math notranslate nohighlight">
+\[ \begin{align}\begin{aligned}\frac{C_D}{100} \leq 0.19\\C_D \leq 19 \text{ ms}\end{aligned}\end{align} \]</div>
+<p><strong>Answer</strong>: Task D can execute for up to <strong>19ms</strong> per 100ms period.</p>
+<p><strong>Bonus: Rate Monotonic Analysis (RMA)</strong></p>
+<p>RMA optimal priority assignment: <strong>shorter period = higher priority</strong></p>
+<p>Current assignment:</p>
+<ul class="simple">
+<li><p>Task A: period 10ms, priority 3 ✓</p></li>
+<li><p>Task B: period 20ms, priority 2 ✓</p></li>
+<li><p>Task C: period 50ms, priority 1 ✓</p></li>
+</ul>
+<p><strong>Result</strong>: Priorities are optimal per RMA.</p>
+</section>
+</section>
+<section id="common-mistakes-to-avoid">
+<h2>Common Mistakes to Avoid<a class="headerlink" href="#common-mistakes-to-avoid" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Assuming vTaskDelay is precise</strong>: It’s a minimum delay; actual delay is ceil(delay/tick_period). Use vTaskDelayUntil for periodic tasks.</p></li>
+<li><p><strong>Ignoring stack size</strong>: Stack overflow is silent killer. Over-provision initially (2x estimate), then measure with watermark APIs.</p></li>
+<li><p><strong>Priority inversion neglect</strong>: Always use mutexes (not binary semaphores) for shared resources to enable priority inheritance.</p></li>
+<li><p><strong>Unbounded operations in high-priority tasks</strong>: Every loop needs a maximum iteration count or yield point.</p></li>
+<li><p><strong>Polling in tasks</strong>: Use blocking IPC (queues, semaphores) to avoid wasting CPU and enable lower-priority tasks to run.</p></li>
+<li><p><strong>Missing deadline analysis</strong>: Don’t just code and hope; calculate WCRT before implementation.</p></li>
+</ol>
+</section>
+<section id="id12">
+<h2>Key Takeaways<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>RTOS shines when</strong> concurrent activities have different urgencies</p></li>
+<li><p><strong>Preemption provides responsiveness</strong> but requires careful priority assignment</p></li>
+<li><p><strong>Determinism comes from</strong> bounded execution, priority management, and avoiding locks</p></li>
+<li><p><strong>Always analyze</strong> CPU utilization and worst-case response times before declaring success</p></li>
+<li><p><strong>Measure in production</strong>: Use instrumentation (GPIO toggles, timestamps) to validate timing assumptions</p></li>
+</ul>
+<p><strong>Next</strong>: Day 02 dives into task lifecycle, stack management, and priority pitfalls.</p>
+</section>
+<section id="navigation">
+<h2>Navigation<a class="headerlink" href="#navigation" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="day02.html"><span class="doc">Next (02)</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Daily Learning Path</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-01-lesson-introduction-to-real-time-operating-systems">Day 01 Lesson - Introduction to Real-Time Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-01-exercises-introduction-to-rtos">Day 01 Exercises - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-01-solutions-introduction-to-rtos">Day 01 Solutions - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#id1">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-lesson-tasks-and-threads">Day 02 Lesson - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-exercises-tasks-and-threads">Day 02 Exercises - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-solutions-tasks-and-threads">Day 02 Solutions - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#id1">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-lesson-scheduling-and-determinism">Day 03 Lesson - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-exercises-scheduling-and-determinism">Day 03 Exercises - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-solutions-scheduling-and-determinism">Day 03 Solutions - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#id1">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-lesson-context-switching">Day 04 Lesson - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-exercises-context-switching">Day 04 Exercises - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-solutions-context-switching">Day 04 Solutions - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#id1">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-lesson-semaphores-and-mutexes">Day 05 Lesson - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-exercises-semaphores-and-mutexes">Day 05 Exercises - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-solutions-semaphores-and-mutexes">Day 05 Solutions - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#id1">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-lesson-queues-and-event-groups">Day 06 Lesson - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-exercises-queues-and-event-groups">Day 06 Exercises - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-solutions-queues-and-event-groups">Day 06 Solutions - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#id1">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-lesson-interrupt-handling-with-rtos">Day 07 Lesson - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-exercises-interrupt-handling-with-rtos">Day 07 Exercises - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-solutions-interrupt-handling-with-rtos">Day 07 Solutions - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#id1">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-lesson-memory-and-stack-management">Day 08 Lesson - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-exercises-memory-and-stack-management">Day 08 Exercises - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-solutions-memory-and-stack-management">Day 08 Solutions - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#id1">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-lesson-latency-jitter-and-timing-analysis">Day 09 Lesson - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-exercises-latency-jitter-and-timing-analysis">Day 09 Exercises - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-solutions-latency-jitter-and-timing-analysis">Day 09 Solutions - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#id1">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-lesson-build-systems-ports-and-board-bringup">Day 10 Lesson - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-exercises-build-systems-ports-and-board-bringup">Day 10 Exercises - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-solutions-build-systems-ports-and-board-bringup">Day 10 Solutions - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#id1">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-lesson-freertos-deep-dive">Day 11 Lesson - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-exercises-freertos-deep-dive">Day 11 Exercises - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-solutions-freertos-deep-dive">Day 11 Solutions - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#id1">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-lesson-zephyr-rtos">Day 12 Lesson - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-exercises-zephyr-rtos">Day 12 Exercises - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-solutions-zephyr-rtos">Day 12 Solutions - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#id1">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-lesson-chibios">Day 13 Lesson - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-exercises-chibios">Day 13 Exercises - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-solutions-chibios">Day 13 Solutions - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#id1">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-lesson-threadx-azure-rtos">Day 14 Lesson - ThreadX (Azure RTOS)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-exercises-threadx">Day 14 Exercises - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-solutions-threadx">Day 14 Solutions - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html#id1">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html#id1">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html#id1">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html#id1">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#id1">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-lesson-rtos-comparison-and-selection">Day 19 Lesson - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-exercises-rtos-comparison-and-selection">Day 19 Exercises - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-solutions-rtos-comparison-and-selection">Day 19 Solutions - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#id1">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-lesson-final-project">Day 20 Lesson - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-exercises-final-project">Day 20 Exercises - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-solutions-final-project">Day 20 Solutions - Final Project</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Daily Learning Path</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Daily Learning Path</a></li>
+      <li>Next: <a href="day02.html" title="next chapter">Day 02 - Tasks and Threads</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/days/day01.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

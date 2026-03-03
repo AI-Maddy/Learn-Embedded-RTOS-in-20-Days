@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Azure ThreadX Cheat Sheet &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="azure-threadx-cheat-sheet">
+<h1>Azure ThreadX Cheat Sheet<a class="headerlink" href="#azure-threadx-cheat-sheet" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<section id="initialization">
+<h3>Initialization<a class="headerlink" href="#initialization" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;tx_api.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Enter ThreadX kernel</span>
+<span class="w">    </span><span class="n">tx_kernel_enter</span><span class="p">();</span>
+<span class="w">    </span><span class="c1">// Never returns</span>
+<span class="p">}</span>
+
+<span class="c1">// Application definition function</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">tx_application_define</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">first_unused_memory</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Create threads, semaphores, queues, etc.</span>
+
+<span class="w">    </span><span class="n">UCHAR</span><span class="w"> </span><span class="o">*</span><span class="n">pointer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">UCHAR</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">first_unused_memory</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Create thread</span>
+<span class="w">    </span><span class="n">tx_thread_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">my_thread</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;My Thread&quot;</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">my_thread_entry</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">pointer</span><span class="p">,</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span>
+<span class="w">                     </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">TX_NO_TIME_SLICE</span><span class="p">,</span>
+<span class="w">                     </span><span class="n">TX_AUTO_START</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">pointer</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">1024</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="thread-api">
+<h2>Thread API<a class="headerlink" href="#thread-api" title="Link to this heading">¶</a></h2>
+<section id="create-delete">
+<h3>Create/Delete<a class="headerlink" href="#create-delete" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_THREAD</span><span class="w"> </span><span class="n">my_thread</span><span class="p">;</span>
+<span class="n">UCHAR</span><span class="w"> </span><span class="n">my_thread_stack</span><span class="p">[</span><span class="mi">1024</span><span class="p">];</span>
+
+<span class="n">UINT</span><span class="w"> </span><span class="n">tx_thread_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">entry_function</span><span class="p">)(</span><span class="n">ULONG</span><span class="p">),</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">entry_input</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">stack_start</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">stack_size</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">priority</span><span class="p">,</span><span class="w">              </span><span class="c1">// 0 = highest, 31 = lowest</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">preempt_threshold</span><span class="p">,</span><span class="w">     </span><span class="c1">// 0-31, disable preemption</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">time_slice</span><span class="p">,</span><span class="w">           </span><span class="c1">// TX_NO_TIME_SLICE</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">auto_start</span><span class="w">             </span><span class="c1">// TX_AUTO_START or TX_DONT_START</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete thread</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_delete</span><span class="p">(</span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">);</span>
+
+<span class="c1">// Thread entry function</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">my_thread_entry</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">thread_input</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Thread body</span>
+<span class="w">        </span><span class="n">tx_thread_sleep</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="sleep-delay">
+<h3>Sleep/Delay<a class="headerlink" href="#sleep-delay" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Sleep (ticks)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_sleep</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">timer_ticks</span><span class="p">);</span>
+
+<span class="c1">// Relinquish (yield to equal priority)</span>
+<span class="n">VOID</span><span class="w"> </span><span class="nf">tx_thread_relinquish</span><span class="p">(</span><span class="n">VOID</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-control">
+<h3>Priority/Control<a class="headerlink" href="#priority-control" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Change priority</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_priority_change</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">new_priority</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">old_priority</span>
+<span class="p">);</span>
+
+<span class="c1">// Suspend/Resume</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_suspend</span><span class="p">(</span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">);</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_resume</span><span class="p">(</span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">);</span>
+
+<span class="c1">// Terminate thread</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_terminate</span><span class="p">(</span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">);</span>
+
+<span class="c1">// Reset thread (restart from entry point)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_reset</span><span class="p">(</span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">);</span>
+
+<span class="c1">// Preemption threshold (prevent preemption by lower priorities)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_preemption_change</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">new_threshold</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">old_threshold</span>
+<span class="p">);</span>
+
+<span class="c1">// Time slice change</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_time_slice_change</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">new_time_slice</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">old_time_slice</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="thread-info">
+<h3>Thread Info<a class="headerlink" href="#thread-info" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get current thread</span>
+<span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="nf">tx_thread_identify</span><span class="p">(</span><span class="n">VOID</span><span class="p">);</span>
+
+<span class="c1">// Get thread info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_thread_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">*</span><span class="n">thread_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">state</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">run_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">priority</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">preemption_threshold</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">time_slice</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">next_thread</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">suspended_thread</span>
+<span class="p">);</span>
+
+<span class="c1">// States: TX_READY, TX_COMPLETED, TX_TERMINATED, TX_SUSPENDED, etc.</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="semaphore-api">
+<h2>Semaphore API<a class="headerlink" href="#semaphore-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="n">my_semaphore</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">initial_count</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_delete</span><span class="p">(</span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">);</span>
+
+<span class="c1">// Get (wait/decrement)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+<span class="c1">// wait_option: TX_NO_WAIT, TX_WAIT_FOREVER, or timeout value</span>
+
+<span class="c1">// Put (signal/increment)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_put</span><span class="p">(</span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">);</span>
+
+<span class="c1">// Prioritize waiting threads (default is FIFO)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_prioritize</span><span class="p">(</span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">);</span>
+
+<span class="c1">// Get info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_semaphore_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">*</span><span class="n">semaphore_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">current_value</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_SEMAPHORE</span><span class="w"> </span><span class="o">**</span><span class="n">next_semaphore</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mutex-api">
+<h2>Mutex API<a class="headerlink" href="#mutex-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="n">my_mutex</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">priority_inherit</span><span class="w">  </span><span class="c1">// TX_INHERIT or TX_NO_INHERIT</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_delete</span><span class="p">(</span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">);</span>
+
+<span class="c1">// Get (lock)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Put (unlock)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_put</span><span class="p">(</span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">);</span>
+
+<span class="c1">// Prioritize waiting threads</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_prioritize</span><span class="p">(</span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_mutex_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">*</span><span class="n">mutex_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">owner</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_MUTEX</span><span class="w"> </span><span class="o">**</span><span class="n">next_mutex</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Supports priority inheritance, recursive locking allowed</strong></p>
+</section>
+<section id="queue-api">
+<h2>Queue API<a class="headerlink" href="#queue-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="n">my_queue</span><span class="p">;</span>
+<span class="n">ULONG</span><span class="w"> </span><span class="n">my_queue_storage</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span><span class="w">  </span><span class="c1">// Space for messages</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="n">tx_queue_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">message_size</span><span class="p">,</span><span class="w">          </span><span class="c1">// In ULONG words (1, 2, 4, 8, 16)</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">queue_start</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">queue_size</span><span class="w">            </span><span class="c1">// Total bytes</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_delete</span><span class="p">(</span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">);</span>
+
+<span class="c1">// Send (to back)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_send</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">source_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Send to front (urgent)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_front_send</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">source_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Receive</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_receive</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">destination_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Flush (empty)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_flush</span><span class="p">(</span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">);</span>
+
+<span class="c1">// Prioritize waiting threads</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_prioritize</span><span class="p">(</span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">);</span>
+
+<span class="c1">// Send notify callback</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_send_notify</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">queue_send_notify</span><span class="p">)(</span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="p">)</span>
+<span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_queue_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">*</span><span class="n">queue_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">enqueued</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">available_storage</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_QUEUE</span><span class="w"> </span><span class="o">**</span><span class="n">next_queue</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="event-flags-api">
+<h2>Event Flags API<a class="headerlink" href="#event-flags-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="n">my_event_flags</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_delete</span><span class="p">(</span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">);</span>
+
+<span class="c1">// Set flags</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_set</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">flags_to_set</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">set_option</span><span class="w">         </span><span class="c1">// TX_OR or TX_AND</span>
+<span class="p">);</span>
+
+<span class="c1">// Get flags (wait)</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">requested_flags</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">get_option</span><span class="p">,</span><span class="w">        </span><span class="c1">// TX_OR | TX_AND, TX_OR_CLEAR, TX_AND_CLEAR</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">actual_flags_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">current_flags</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">**</span><span class="n">next_group</span>
+<span class="p">);</span>
+
+<span class="c1">// Notify callback</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_event_flags_set_notify</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="n">group_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">events_set_notify</span><span class="p">)(</span><span class="n">TX_EVENT_FLAGS_GROUP</span><span class="w"> </span><span class="o">*</span><span class="p">)</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="block-memory-pool-api">
+<h2>Block Memory Pool API<a class="headerlink" href="#block-memory-pool-api" title="Link to this heading">¶</a></h2>
+<p>Fixed-size block allocator:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="n">my_pool</span><span class="p">;</span>
+<span class="n">UCHAR</span><span class="w"> </span><span class="n">my_pool_storage</span><span class="p">[</span><span class="mi">1000</span><span class="p">];</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_pool_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">block_size</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">pool_start</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">pool_size</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_pool_delete</span><span class="p">(</span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">);</span>
+
+<span class="c1">// Allocate block</span>
+<span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">block_ptr</span><span class="p">;</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_allocate</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">**</span><span class="n">block_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Release block</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_release</span><span class="p">(</span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">block_ptr</span><span class="p">);</span>
+
+<span class="c1">// Prioritize</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_pool_prioritize</span><span class="p">(</span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_block_pool_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">available_blocks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">total_blocks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_BLOCK_POOL</span><span class="w"> </span><span class="o">**</span><span class="n">next_pool</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="byte-memory-pool-api">
+<h2>Byte Memory Pool API<a class="headerlink" href="#byte-memory-pool-api" title="Link to this heading">¶</a></h2>
+<p>Variable-size allocator (like heap):</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="n">my_byte_pool</span><span class="p">;</span>
+<span class="n">UCHAR</span><span class="w"> </span><span class="n">my_byte_pool_storage</span><span class="p">[</span><span class="mi">2000</span><span class="p">];</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_pool_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">pool_start</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">pool_size</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_pool_delete</span><span class="p">(</span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">);</span>
+
+<span class="c1">// Allocate</span>
+<span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">memory_ptr</span><span class="p">;</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_allocate</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="o">**</span><span class="n">memory_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">memory_size</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">wait_option</span>
+<span class="p">);</span>
+
+<span class="c1">// Release</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_release</span><span class="p">(</span><span class="n">VOID</span><span class="w"> </span><span class="o">*</span><span class="n">memory_ptr</span><span class="p">);</span>
+
+<span class="c1">// Prioritize</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_pool_prioritize</span><span class="p">(</span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_byte_pool_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">*</span><span class="n">pool_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">available_bytes</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">fragments</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_THREAD</span><span class="w"> </span><span class="o">**</span><span class="n">first_suspended</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">suspended_count</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_BYTE_POOL</span><span class="w"> </span><span class="o">**</span><span class="n">next_pool</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="timer-api">
+<h2>Timer API<a class="headerlink" href="#timer-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_TIMER</span><span class="w"> </span><span class="n">my_timer</span><span class="p">;</span>
+
+<span class="c1">// Timer callback</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">timer_expiration_function</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Called from timer thread context</span>
+<span class="p">}</span>
+
+<span class="c1">// Create</span>
+<span class="n">UINT</span><span class="w"> </span><span class="n">tx_timer_create</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">*</span><span class="n">name_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VOID</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">expiration_function</span><span class="p">)(</span><span class="n">ULONG</span><span class="p">),</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">expiration_input</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">initial_ticks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">reschedule_ticks</span><span class="p">,</span><span class="w">     </span><span class="c1">// 0 = one-shot</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="n">auto_activate</span><span class="w">          </span><span class="c1">// TX_AUTO_ACTIVATE or TX_NO_ACTIVATE</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_timer_delete</span><span class="p">(</span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">);</span>
+
+<span class="c1">// Activate/Deactivate</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_timer_activate</span><span class="p">(</span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">);</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_timer_deactivate</span><span class="p">(</span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">);</span>
+
+<span class="c1">// Change</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_timer_change</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">initial_ticks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">reschedule_ticks</span>
+<span class="p">);</span>
+
+<span class="c1">// Info</span>
+<span class="n">UINT</span><span class="w"> </span><span class="nf">tx_timer_info_get</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">*</span><span class="n">timer_ptr</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CHAR</span><span class="w"> </span><span class="o">**</span><span class="n">name</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UINT</span><span class="w"> </span><span class="o">*</span><span class="n">active</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">remaining_ticks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="o">*</span><span class="n">reschedule_ticks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TX_TIMER</span><span class="w"> </span><span class="o">**</span><span class="n">next_timer</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="interrupt-control">
+<h2>Interrupt Control<a class="headerlink" href="#interrupt-control" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Disable interrupts</span>
+<span class="n">UINT</span><span class="w"> </span><span class="n">posture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tx_interrupt_control</span><span class="p">(</span><span class="n">TX_INT_DISABLE</span><span class="p">);</span>
+
+<span class="c1">// Restore interrupts</span>
+<span class="n">tx_interrupt_control</span><span class="p">(</span><span class="n">posture</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="time-services">
+<h2>Time Services<a class="headerlink" href="#time-services" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get system time (ticks since startup)</span>
+<span class="n">ULONG</span><span class="w"> </span><span class="nf">tx_time_get</span><span class="p">(</span><span class="n">VOID</span><span class="p">);</span>
+
+<span class="c1">// Set system time</span>
+<span class="n">VOID</span><span class="w"> </span><span class="nf">tx_time_set</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">new_time</span><span class="p">);</span>
+
+<span class="c1">// Convert ms to ticks (assuming 1000 ticks/sec)</span>
+<span class="cp">#define MS_TO_TICKS(ms) (ms)</span>
+<span class="cp">#define TICKS_TO_MS(ticks) (ticks)</span>
+</pre></div>
+</div>
+</section>
+<section id="return-values">
+<h2>Return Values<a class="headerlink" href="#return-values" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TX_SUCCESS</span><span class="w">              </span><span class="c1">// 0x00 - Successful</span>
+<span class="n">TX_DELETED</span><span class="w">              </span><span class="c1">// 0x01 - Object was deleted</span>
+<span class="n">TX_NO_MEMORY</span><span class="w">            </span><span class="c1">// 0x10 - Pool empty</span>
+<span class="n">TX_POOL_ERROR</span><span class="w">           </span><span class="c1">// 0x02 - Invalid pool pointer</span>
+<span class="n">TX_PTR_ERROR</span><span class="w">            </span><span class="c1">// 0x03 - Invalid pointer</span>
+<span class="n">TX_WAIT_ERROR</span><span class="w">           </span><span class="c1">// 0x04 - Wait option invalid from ISR</span>
+<span class="n">TX_SIZE_ERROR</span><span class="w">           </span><span class="c1">// 0x05 - Invalid size</span>
+<span class="n">TX_GROUP_ERROR</span><span class="w">          </span><span class="c1">// 0x06 - Invalid event group</span>
+<span class="n">TX_NO_EVENTS</span><span class="w">            </span><span class="c1">// 0x07 - No events</span>
+<span class="n">TX_OPTION_ERROR</span><span class="w">         </span><span class="c1">// 0x08 - Invalid option</span>
+<span class="n">TX_QUEUE_ERROR</span><span class="w">          </span><span class="c1">// 0x09 - Invalid queue pointer</span>
+<span class="n">TX_QUEUE_EMPTY</span><span class="w">          </span><span class="c1">// 0x0A - Queue is empty</span>
+<span class="n">TX_QUEUE_FULL</span><span class="w">           </span><span class="c1">// 0x0B - Queue is full</span>
+<span class="n">TX_SEMAPHORE_ERROR</span><span class="w">      </span><span class="c1">// 0x0C - Invalid semaphore</span>
+<span class="n">TX_NO_INSTANCE</span><span class="w">          </span><span class="c1">// 0x0D - No available instance</span>
+<span class="n">TX_THREAD_ERROR</span><span class="w">         </span><span class="c1">// 0x0E - Invalid thread pointer</span>
+<span class="n">TX_PRIORITY_ERROR</span><span class="w">       </span><span class="c1">// 0x0F - Invalid priority</span>
+<span class="n">TX_START_ERROR</span><span class="w">          </span><span class="c1">// 0x10 - Invalid auto-start</span>
+<span class="n">TX_DELETE_ERROR</span><span class="w">         </span><span class="c1">// 0x11 - Thread not terminated</span>
+<span class="n">TX_RESUME_ERROR</span><span class="w">         </span><span class="c1">// 0x12 - Thread not suspended</span>
+<span class="n">TX_CALLER_ERROR</span><span class="w">         </span><span class="c1">// 0x13 - Invalid caller</span>
+<span class="n">TX_SUSPEND_ERROR</span><span class="w">        </span><span class="c1">// 0x14 - Invalid suspend</span>
+<span class="n">TX_TIMER_ERROR</span><span class="w">          </span><span class="c1">// 0x15 - Invalid timer</span>
+<span class="n">TX_TICK_ERROR</span><span class="w">           </span><span class="c1">// 0x16 - Invalid tick value</span>
+<span class="n">TX_ACTIVATE_ERROR</span><span class="w">       </span><span class="c1">// 0x17 - Timer already active</span>
+<span class="n">TX_THRESH_ERROR</span><span class="w">         </span><span class="c1">// 0x18 - Invalid threshold</span>
+<span class="n">TX_SUSPEND_LIFTED</span><span class="w">       </span><span class="c1">// 0x19 - Delayed suspend was lifted</span>
+<span class="n">TX_WAIT_ABORTED</span><span class="w">         </span><span class="c1">// 0x1A - Wait was aborted</span>
+<span class="n">TX_MUTEX_ERROR</span><span class="w">          </span><span class="c1">// 0x1C - Invalid mutex pointer</span>
+<span class="n">TX_NOT_AVAILABLE</span><span class="w">        </span><span class="c1">// 0x1D - Service not available</span>
+<span class="n">TX_NOT_OWNED</span><span class="w">            </span><span class="c1">// 0x1E - Not owned by caller</span>
+<span class="n">TX_INHERIT_ERROR</span><span class="w">        </span><span class="c1">// 0x1F - Invalid inherit</span>
+</pre></div>
+</div>
+</section>
+<section id="example-application">
+<h2>Example Application<a class="headerlink" href="#example-application" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;tx_api.h&quot;</span>
+
+<span class="cp">#define STACK_SIZE 1024</span>
+
+<span class="n">TX_THREAD</span><span class="w"> </span><span class="n">producer_thread</span><span class="p">;</span>
+<span class="n">TX_THREAD</span><span class="w"> </span><span class="n">consumer_thread</span><span class="p">;</span>
+<span class="n">TX_QUEUE</span><span class="w"> </span><span class="n">message_queue</span><span class="p">;</span>
+
+<span class="n">UCHAR</span><span class="w"> </span><span class="n">producer_stack</span><span class="p">[</span><span class="n">STACK_SIZE</span><span class="p">];</span>
+<span class="n">UCHAR</span><span class="w"> </span><span class="n">consumer_stack</span><span class="p">[</span><span class="n">STACK_SIZE</span><span class="p">];</span>
+<span class="n">ULONG</span><span class="w"> </span><span class="n">queue_storage</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">producer_entry</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tx_queue_send</span><span class="p">(</span><span class="o">&amp;</span><span class="n">message_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">message</span><span class="p">,</span><span class="w"> </span><span class="n">TX_WAIT_FOREVER</span><span class="p">);</span>
+<span class="w">        </span><span class="n">message</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">tx_thread_sleep</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">consumer_entry</span><span class="p">(</span><span class="n">ULONG</span><span class="w"> </span><span class="n">input</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">ULONG</span><span class="w"> </span><span class="n">message</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">tx_queue_receive</span><span class="p">(</span><span class="o">&amp;</span><span class="n">message_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">message</span><span class="p">,</span><span class="w"> </span><span class="n">TX_WAIT_FOREVER</span><span class="p">);</span>
+<span class="w">        </span><span class="c1">// Process message</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">tx_application_define</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">first_unused_memory</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Create queue</span>
+<span class="w">    </span><span class="n">tx_queue_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">message_queue</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Message Queue&quot;</span><span class="p">,</span>
+<span class="w">                   </span><span class="n">TX_1_ULONG</span><span class="p">,</span><span class="w"> </span><span class="n">queue_storage</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">queue_storage</span><span class="p">));</span>
+
+<span class="w">    </span><span class="c1">// Create threads</span>
+<span class="w">    </span><span class="n">tx_thread_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">producer_thread</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Producer&quot;</span><span class="p">,</span>
+<span class="w">                    </span><span class="n">producer_entry</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="n">producer_stack</span><span class="p">,</span><span class="w"> </span><span class="n">STACK_SIZE</span><span class="p">,</span>
+<span class="w">                    </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="n">TX_NO_TIME_SLICE</span><span class="p">,</span><span class="w"> </span><span class="n">TX_AUTO_START</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">tx_thread_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">consumer_thread</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Consumer&quot;</span><span class="p">,</span>
+<span class="w">                    </span><span class="n">consumer_entry</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">                    </span><span class="n">consumer_stack</span><span class="p">,</span><span class="w"> </span><span class="n">STACK_SIZE</span><span class="p">,</span>
+<span class="w">                    </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"> </span><span class="n">TX_NO_TIME_SLICE</span><span class="p">,</span><span class="w"> </span><span class="n">TX_AUTO_START</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Hardware initialization</span>
+
+<span class="w">    </span><span class="c1">// Enter ThreadX</span>
+<span class="w">    </span><span class="n">tx_kernel_enter</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Never reached</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>✗ Using blocking calls from ISR (use TX_NO_WAIT)
+✗ Not checking return values (always check!)
+✗ Queue message size mismatch
+✗ Insufficient stack size
+✗ Priority 0 is highest (inverse of some RTOSes)
+✗ Forgetting to create objects in tx_application_define()
+✗ Mutex count &gt; 1 means recursive locks
+✗ Using tx_thread_sleep(0) expecting yield (use relinquish)
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Generic RTOS concepts</p></li>
+<li><p><a class="reference internal" href="../days/day14.html"><span class="doc">Day 14 - ThreadX</span></a> - ThreadX deep dive</p></li>
+<li><p>Official Azure RTOS documentation: docs.microsoft.com/azure-rtos</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cheatsheets/threadx_cheatsheet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1 @@
+Day 18 Exercises - eCos\n======================\n\nExercise 1: Configure minimal eCos kernel.\nExercise 2: Add TCP/IP stack to eCos.\nExercise 3: Build network appliance with eCos.

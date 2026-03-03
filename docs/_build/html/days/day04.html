@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Day 04 - Context Switching &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Day 05 - Semaphores and Mutexes" href="day05.html" />
+    <link rel="prev" title="Day 03 - Scheduling and Determinism" href="day03.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="day-04-context-switching">
+<h1>Day 04 - Context Switching<a class="headerlink" href="#day-04-context-switching" title="Link to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="id1">
+<h1>Day 04 - Context Switching<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<section id="focus">
+<h2>Focus<a class="headerlink" href="#focus" title="Link to this heading">¶</a></h2>
+<p>This day concentrates on switch path mechanics and overhead awareness.</p>
+</section>
+<section id="learning-objectives">
+<h2>Learning Objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Understand the core concept and where it appears in embedded products.</p></li>
+<li><p>Build or reason about one practical implementation pattern.</p></li>
+<li><p>Identify failure modes and prevention checks for production firmware.</p></li>
+</ul>
+</section>
+<section id="deliverables">
+<h2>Deliverables<a class="headerlink" href="#deliverables" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Concept notes in <code class="docutils literal notranslate"><span class="pre">lesson.rst</span></code>.</p></li>
+<li><p>Practice problems in <code class="docutils literal notranslate"><span class="pre">exercises.rst</span></code>.</p></li>
+<li><p>Guided answer strategy in <code class="docutils literal notranslate"><span class="pre">solutions.rst</span></code>.</p></li>
+</ul>
+</section>
+<section id="definition-of-done">
+<h2>Definition of Done<a class="headerlink" href="#definition-of-done" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>You can explain the concept without notes.</p></li>
+<li><p>You can map the concept to at least one real product scenario.</p></li>
+<li><p>You can list at least three verification checks for correctness.</p></li>
+</ul>
+</section>
+<section id="lesson">
+<h2>Lesson<a class="headerlink" href="#lesson" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-04-lesson-context-switching">
+<h1>Day 04 Lesson - Context Switching<a class="headerlink" href="#day-04-lesson-context-switching" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>Context switching</strong> is the process of saving the state of one task and restoring the state of another. It’s the fundamental mechanism that enables multitasking in an RTOS. Understanding context switching—what happens, when it happens, and how much it costs—is essential for building efficient real-time systems.</p>
+</section>
+<section id="what-is-a-context-switch">
+<h2>What is a Context Switch?<a class="headerlink" href="#what-is-a-context-switch" title="Link to this heading">¶</a></h2>
+<p>A <strong>context</strong> is the complete CPU state of a task:</p>
+<ul class="simple">
+<li><p><strong>Program Counter (PC)</strong>: Current instruction address</p></li>
+<li><p><strong>Stack Pointer (SP)</strong>: Top of task’s stack</p></li>
+<li><p><strong>CPU Registers</strong>: General-purpose and special registers</p></li>
+<li><p><strong>Status Flags</strong>: Processor status register (PSR)</p></li>
+</ul>
+<p><strong>Context Switch</strong>: Saving one task’s context and loading another’s.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Task A Running:
+  PC = 0x08001234
+  SP = 0x20003F00
+  R0-R12 = [task A values]
+
+[Context Switch Occurs]
+
+Task B Running:
+  PC = 0x08005678
+  SP = 0x20007E00
+  R0-R12 = [task B values]
+</pre></div>
+</div>
+</section>
+<section id="when-does-context-switching-occur">
+<h2>When Does Context Switching Occur?<a class="headerlink" href="#when-does-context-switching-occur" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p><strong>Tick Interrupt</strong></p>
+<p>RTOS scheduler runs periodically (typically 1ms)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">SysTick_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// Save current task context</span>
+<span class="w">    </span><span class="c1">// Check if higher priority task is ready</span>
+<span class="w">    </span><span class="c1">// If yes, perform context switch</span>
+<span class="w">    </span><span class="c1">// Restore new task context</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Blocking API Call</strong></p>
+<p>Task voluntarily yields CPU</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vTaskDelay</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span><span class="w">              </span><span class="c1">// Delay</span>
+<span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span><span class="w"> </span><span class="c1">// Wait for semaphore</span>
+<span class="n">xQueueReceive</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span><span class="w">  </span><span class="c1">// Wait for data</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Preemption</strong></p>
+<p>Higher-priority task becomes ready</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// ISR signals high-priority task</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">xHigherPriorityTaskWoken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">xSemaphoreGiveFromISR</span><span class="p">(</span><span class="n">xUARTSemaphore</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">xHigherPriorityTaskWoken</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Context switch if higher priority task now ready</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">xHigherPriorityTaskWoken</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="arm-cortex-m-context-switch">
+<h2>ARM Cortex-M Context Switch<a class="headerlink" href="#arm-cortex-m-context-switch" title="Link to this heading">¶</a></h2>
+<section id="cortex-m-register-set">
+<h3>Cortex-M Register Set<a class="headerlink" href="#cortex-m-register-set" title="Link to this heading">¶</a></h3>
+<p><strong>Core Registers (R0-R15):</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>R0-R3:   Argument/scratch registers
+R4-R11:  Saved registers (preserved across calls)
+R12:     Intra-procedure-call scratch register
+R13 (SP): Stack Pointer
+R14 (LR): Link Register (return address)
+R15 (PC): Program Counter
+</pre></div>
+</div>
+<p><strong>Special Registers:</strong></p>
+<ul class="simple">
+<li><p><strong>PSR</strong>: Program Status Register (flags, execution mode)</p></li>
+<li><p><strong>PRIMASK</strong>: Interrupt mask</p></li>
+<li><p><strong>CONTROL</strong>: Stack selection, privilege level</p></li>
+</ul>
+</section>
+<section id="hardware-assisted-context-switch">
+<h3>Hardware-Assisted Context Switch<a class="headerlink" href="#hardware-assisted-context-switch" title="Link to this heading">¶</a></h3>
+<p>Cortex-M processors have <strong>automatic stacking</strong> for interrupts:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Interrupt Entry (Hardware):
+  1. Push R0-R3, R12, LR, PC, PSR to stack
+  2. Set LR to special return value (EXC_RETURN)
+  3. Jump to ISR
+
+Interrupt Exit (Hardware):
+  1. Pop R0-R3, R12, LR, PC, PSR from stack
+  2. Resume execution
+</pre></div>
+</div>
+<p><strong>Software saves remaining registers (R4-R11):</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// PendSV_Handler: Context switch ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">PendSV_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// Disable interrupts</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">&quot;CPSID I&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Save current task context</span>
+<span class="w">    </span><span class="c1">// Get current task SP</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">&quot;MRS R0, PSP&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Get Process Stack Pointer</span>
+
+<span class="w">    </span><span class="c1">// Save R4-R11 (hardware already saved R0-R3, R12, LR, PC, PSR)</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span>
+<span class="w">        </span><span class="s">&quot;STMDB R0!, {R4-R11}</span><span class="se">\\</span><span class="s">n&quot;</span><span class="w">  </span><span class="c1">// Push R4-R11 onto stack</span>
+<span class="w">        </span><span class="s">&quot;MOV %0, R0&quot;</span><span class="w">              </span><span class="c1">// Save new SP</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="s">&quot;=r&quot;</span><span class="p">(</span><span class="n">pxCurrentTCB</span><span class="o">-&gt;</span><span class="n">pxTopOfStack</span><span class="p">)</span>
+<span class="w">    </span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Select next task</span>
+<span class="w">    </span><span class="n">vTaskSwitchContext</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Restore new task context</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span>
+<span class="w">        </span><span class="s">&quot;MOV R0, %0</span><span class="se">\\</span><span class="s">n&quot;</span><span class="w">           </span><span class="c1">// Load new task SP</span>
+<span class="w">        </span><span class="s">&quot;LDMIA R0!, {R4-R11}</span><span class="se">\\</span><span class="s">n&quot;</span><span class="w">  </span><span class="c1">// Pop R4-R11 from stack</span>
+<span class="w">        </span><span class="s">&quot;MSR PSP, R0&quot;</span><span class="w">             </span><span class="c1">// Set Process Stack Pointer</span>
+<span class="w">        </span><span class="o">:</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">&quot;r&quot;</span><span class="p">(</span><span class="n">pxCurrentTCB</span><span class="o">-&gt;</span><span class="n">pxTopOfStack</span><span class="p">)</span>
+<span class="w">    </span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Enable interrupts</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">&quot;CPSIE I&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Return (hardware restores R0-R3, R12, LR, PC, PSR)</span>
+<span class="w">    </span><span class="kr">__asm</span><span class="w"> </span><span class="k">volatile</span><span class="p">(</span><span class="s">&quot;BX LR&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="freertos-context-switch-implementation">
+<h3>FreeRTOS Context Switch Implementation<a class="headerlink" href="#freertos-context-switch-implementation" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Trigger context switch (sets PendSV interrupt)</span>
+<span class="cp">#define portYIELD()  do { \\</span>
+<span class="cp">    portNVIC_INT_CTRL_REG = portNVIC_PENDSVSET_BIT; \\</span>
+<span class="cp">    __asm volatile(&quot;DSB&quot;); \\</span>
+<span class="cp">    __asm volatile(&quot;ISB&quot;); \\</span>
+<span class="cp">} while(0)</span>
+
+<span class="c1">// PendSV has lowest interrupt priority</span>
+<span class="c1">// Ensures context switch happens after all other ISRs complete</span>
+</pre></div>
+</div>
+<p><strong>Why PendSV?</strong></p>
+<ul class="simple">
+<li><p><strong>Tail-chaining</strong>: Multiple interrupts can complete before context switch</p></li>
+<li><p><strong>Efficient</strong>: Context switch deferred until all ISRs handled</p></li>
+<li><p><strong>Clean</strong>: Consistent stack state</p></li>
+</ul>
+</section>
+</section>
+<section id="context-switch-cost">
+<h2>Context Switch Cost<a class="headerlink" href="#context-switch-cost" title="Link to this heading">¶</a></h2>
+<section id="measuring-overhead">
+<h3>Measuring Overhead<a class="headerlink" href="#measuring-overhead" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">measure_context_switch_time</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="p">,</span><span class="w"> </span><span class="n">end</span><span class="p">,</span><span class="w"> </span><span class="n">duration_cycles</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Disable interrupts for accurate measurement</span>
+<span class="w">    </span><span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span><span class="w">  </span><span class="c1">// Cycle counter</span>
+
+<span class="w">    </span><span class="c1">// Force context switch</span>
+<span class="w">    </span><span class="n">taskYIELD</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">duration_cycles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">duration_us</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">duration_cycles</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="n">SystemCoreClock</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1000000</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Context switch: %lu cycles (%.2f µs)</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">duration_cycles</span><span class="p">,</span><span class="w"> </span><span class="n">duration_us</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Typical Costs:</strong></p>
+<p><strong>Factors Affecting Cost:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Number of registers</strong> to save/restore</p></li>
+<li><p><strong>Floating-point unit (FPU)</strong>: +34 registers if FPU used</p></li>
+<li><p><strong>Cache/MPU configuration</strong></p></li>
+<li><p><strong>Interrupt latency</strong></p></li>
+</ol>
+</section>
+<section id="context-switch-frequency">
+<h3>Context Switch Frequency<a class="headerlink" href="#context-switch-frequency" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">monitor_context_switches</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">last_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">current_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uxTaskGetNumberOfTasks</span><span class="p">();</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">current_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">switches</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_count</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">last_count</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">time_delta_ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">last_time</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">switches_per_sec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">switches</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="n">time_delta_ms</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1000.0f</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Context switches: %.1f per second</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">switches_per_sec</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Calculate CPU overhead</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">cs_time_us</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.2</span><span class="p">;</span><span class="w">  </span><span class="c1">// Measured context switch time</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">overhead_percent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">switches_per_sec</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">cs_time_us</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">1000000</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Context switch overhead: %.2f%%</span><span class="se">\\</span><span class="s">n</span><span class="se">\&quot;</span><span class="s">, overhead_percent);</span>
+
+<span class="w">    </span><span class="n">last_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_count</span><span class="p">;</span>
+<span class="w">    </span><span class="n">last_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_time</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Example:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>10 tasks, 1ms tick rate
+Worst case: 1000 context switches/second
+@ 0.2µs per switch = 0.2ms/second = 0.02% CPU overhead
+
+Negligible!
+</pre></div>
+</div>
+</section>
+</section>
+<section id="lazy-context-switching">
+<h2>Lazy Context Switching<a class="headerlink" href="#lazy-context-switching" title="Link to this heading">¶</a></h2>
+<p><strong>Lazy FPU Context Save:</strong></p>
+<p>Cortex-M4F/M7 can defer saving FPU registers until necessary:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS FPU configuration</span>
+<span class="cp">#define configENABLE_FPU                1</span>
+<span class="cp">#define configENABLE_TRUSTZONE          0</span>
+
+<span class="c1">// Only save FPU context if task actually used FPU</span>
+<span class="c1">// Saves 34 registers (136 bytes) if FPU not used</span>
+</pre></div>
+</div>
+<p><strong>Implementation:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Task A (uses FPU):
+  - Full context save (CPU + FPU registers)
+
+Task B (no FPU):
+  - Minimal context save (CPU registers only)
+  - 34 fewer registers = 70% faster context switch!
+</pre></div>
+</div>
+</section>
+<section id="voluntary-vs-involuntary-context-switch">
+<h2>Voluntary vs. Involuntary Context Switch<a class="headerlink" href="#voluntary-vs-involuntary-context-switch" title="Link to this heading">¶</a></h2>
+<section id="voluntary-cooperative">
+<h3>Voluntary (Cooperative)<a class="headerlink" href="#voluntary-cooperative" title="Link to this heading">¶</a></h3>
+<p>Task explicitly yields:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">cooperative_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(;;)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">do_some_work</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Explicitly yield CPU</span>
+<span class="w">        </span><span class="n">taskYIELD</span><span class="p">();</span><span class="w">  </span><span class="c1">// or vTaskDelay(0);</span>
+
+<span class="w">        </span><span class="n">do_more_work</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Pros:</strong>
+- Task completes “atomic” operations
+- No race conditions within task
+- Lower overhead (no tick interrupt needed)</p>
+<p><strong>Cons:</strong>
+- One misbehaving task blocks system
+- Poor real-time responsiveness</p>
+</section>
+<section id="involuntary-preemptive">
+<h3>Involuntary (Preemptive)<a class="headerlink" href="#involuntary-preemptive" title="Link to this heading">¶</a></h3>
+<p>Scheduler forces context switch:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">preemptive_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(;;)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// This may be preempted at ANY time</span>
+<span class="w">        </span><span class="n">complex_calculation</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// No explicit yield needed</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Pros:</strong>
+- Guaranteed responsiveness
+- Higher-priority tasks never blocked by lower
+- Better for real-time</p>
+<p><strong>Cons:</strong>
+- Need synchronization (mutexes, critical sections)
+- Slightly higher overhead</p>
+<p>FreeRTOS Default: <strong>Preemptive with cooperative option</strong></p>
+</section>
+</section>
+<section id="critical-sections-and-context-switching">
+<h2>Critical Sections and Context Switching<a class="headerlink" href="#critical-sections-and-context-switching" title="Link to this heading">¶</a></h2>
+<section id="disabling-context-switches">
+<h3>Disabling Context Switches<a class="headerlink" href="#disabling-context-switches" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">atomic_operation</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="c1">// Method 1: Disable interrupts (fast but blocks ISRs!)</span>
+<span class="w">    </span><span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Atomic operation (no context switch possible)</span>
+<span class="w">    </span><span class="n">global_counter</span><span class="o">++</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+
+<span class="w">    </span><span class="c1">// Method 2: Suspend scheduler (ISRs still run)</span>
+<span class="w">    </span><span class="n">vTaskSuspendAll</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Multiple operations, no context switch</span>
+<span class="w">    </span><span class="n">update_shared_data</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">xTaskResumeAll</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Critical Section Maximum Duration:</strong></p>
+<ul class="simple">
+<li><p>Keep &lt; 100µs on most systems</p></li>
+<li><p>Longer durations affect interrupt latency</p></li>
+<li><p>Affects system responsiveness</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// BAD: Critical section too long</span>
+<span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">  </span><span class="c1">// May take milliseconds!</span>
+<span class="w">    </span><span class="n">process_item</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+<span class="c1">// GOOD: Minimal critical section</span>
+<span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">10000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">process_item</span><span class="p">(</span><span class="n">i</span><span class="p">);</span><span class="w">  </span><span class="c1">// Outside critical section</span>
+<span class="p">}</span>
+<span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="n">update_shared_result</span><span class="p">();</span><span class="w">  </span><span class="c1">// Only shared access protected</span>
+<span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="real-world-example-data-logger-with-context-switch-optimization">
+<h2>Real-World Example: Data Logger with Context Switch Optimization<a class="headerlink" href="#real-world-example-data-logger-with-context-switch-optimization" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;FreeRTOS.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;task.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;queue.h&quot;</span>
+
+<span class="c1">// High-frequency data acquisition</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">sensor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xLastWakeTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xPeriod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1ms = 1kHz</span>
+
+<span class="w">    </span><span class="k">for</span><span class="p">(;;)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">xLastWakeTime</span><span class="p">,</span><span class="w"> </span><span class="n">xPeriod</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Read sensor (fast, DMA-based)</span>
+<span class="w">        </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">adc_read_dma</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Send to queue (may trigger context switch)</span>
+<span class="w">        </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">xDataQueue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Lower-priority processing</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">processing_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">raw_values</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="p">(;;)</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Batch processing to reduce context switches</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="n">count</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">&amp;&amp;</span>
+<span class="w">              </span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">xDataQueue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">raw_values</span><span class="p">[</span><span class="n">count</span><span class="p">],</span>
+<span class="w">                            </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdPASS</span><span class="p">)</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="n">count</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Process batch</span>
+<span class="w">            </span><span class="n">process_batch</span><span class="p">(</span><span class="n">raw_values</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">);</span>
+<span class="w">            </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Optimization:</strong></p>
+<ul class="simple">
+<li><p>Sensor task minimizes work (just read &amp; send)</p></li>
+<li><p>Processing task batches data: fewer context switches</p></li>
+<li><p>100 samples processed in one context vs. 100 contexts</p></li>
+</ul>
+<p><strong>Result:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Before batching:
+  - 1000 sensor reads/sec
+  - 1000 context switches/sec
+  - 0.2% CPU overhead
+
+After batching:
+  - 1000 sensor reads/sec
+  - 10 context switches/sec (100x reduction!)
+  - 0.002% CPU overhead
+</pre></div>
+</div>
+</section>
+<section id="stack-traces-and-debugging">
+<h2>Stack Traces and Debugging<a class="headerlink" href="#stack-traces-and-debugging" title="Link to this heading">¶</a></h2>
+<section id="inspecting-task-context">
+<h3>Inspecting Task Context<a class="headerlink" href="#inspecting-task-context" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">print_task_stack_trace</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="n">TaskStatus_t</span><span class="w"> </span><span class="n">xTaskDetails</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">vTaskGetInfo</span><span class="p">(</span><span class="n">xTask</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">xTaskDetails</span><span class="p">,</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">,</span><span class="w"> </span><span class="n">eRunning</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Task: %s</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">xTaskDetails</span><span class="p">.</span><span class="n">pcTaskName</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;  Stack High Water Mark: %u words</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">xTaskDetails</span><span class="p">.</span><span class="n">usStackHighWaterMark</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;  Stack Base: 0x%08X</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="n">xTaskDetails</span><span class="p">.</span><span class="n">pxStackBase</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Walk stack (platform-specific)</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">sp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="o">*</span><span class="p">)</span><span class="n">xTaskDetails</span><span class="p">.</span><span class="n">pxStackBase</span><span class="p">;</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;  Stack contents:</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">16</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;    [0x%08X] = 0x%08X</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="o">&amp;</span><span class="n">sp</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">sp</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="context-switch-hooks">
+<h3>Context Switch Hooks<a class="headerlink" href="#context-switch-hooks" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOSConfig.h</span>
+<span class="cp">#define configUSE_TRACE_FACILITY  1</span>
+
+<span class="c1">// Application hook (called on every context switch)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vApplicationTaskSwitchHook</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">switch_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">switch_count</span><span class="o">++</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xNewTask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetCurrentTaskHandle</span><span class="p">();</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">pcTaskName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pcTaskGetName</span><span class="p">(</span><span class="n">xNewTask</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;[%lu] Context switch to: %s</span><span class="se">\\</span><span class="s">n&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">switch_count</span><span class="p">,</span><span class="w"> </span><span class="n">pcTaskName</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
+<p><strong>Key Concepts:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Context switching</strong> saves one task’s state and restores another’s</p></li>
+<li><p><strong>Triggered by</strong>: Tick interrupts, blocking calls, preemption</p></li>
+<li><p><strong>Hardware assistance</strong> (Cortex-M): Automatic stacking of R0-R3, R12, LR, PC, PSR</p></li>
+<li><p><strong>Cost</strong>: Typically 0.1-0.5µs on modern MCUs (negligible overhead)</p></li>
+<li><p><strong>Optimization</strong>: Batch operations, minimize unnecessary switches</p></li>
+</ol>
+<p><strong>Best Practices:</strong></p>
+<ul class="simple">
+<li><p>Don’t fear context switches—overhead is minimal on modern MCUs</p></li>
+<li><p>Use preemptive scheduling for responsiveness</p></li>
+<li><p>Keep critical sections short (&lt;100µs)</p></li>
+<li><p>Batch operations when possible to reduce switch frequency</p></li>
+<li><p>Enable lazy FPU context saving if applicable</p></li>
+<li><p>Monitor context switch frequency during development</p></li>
+</ul>
+<p>Understanding context switching demystifies RTOS behavior and enables building efficient multitasking systems.</p>
+</section>
+<section id="exercises">
+<h2>Exercises<a class="headerlink" href="#exercises" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-04-exercises-context-switching">
+<h1>Day 04 Exercises - Context Switching<a class="headerlink" href="#day-04-exercises-context-switching" title="Link to this heading">¶</a></h1>
+<section id="exercise-1-context-switch-timing-measurement">
+<h2>Exercise 1 - Context Switch Timing Measurement<a class="headerlink" href="#exercise-1-context-switch-timing-measurement" title="Link to this heading">¶</a></h2>
+<section id="objective">
+<h3>Objective<a class="headerlink" href="#objective" title="Link to this heading">¶</a></h3>
+<p>Measure actual context switch overhead on your target hardware and analyze factors affecting performance.</p>
+</section>
+<section id="tasks">
+<h3>Tasks<a class="headerlink" href="#tasks" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>Enable DWT cycle counter for precise timing</p></li>
+<li><p>Implement context switch measurement function</p></li>
+<li><p>Compare with and without FPU usage</p></li>
+<li><p>Measure impact of interrupt priority</p></li>
+<li><p>Calculate overhead as percentage of CPU</p></li>
+</ol>
+</section>
+</section>
+<section id="exercise-2-stack-analysis-during-context-switch">
+<h2>Exercise 2 - Stack Analysis During Context Switch<a class="headerlink" href="#exercise-2-stack-analysis-during-context-switch" title="Link to this heading">¶</a></h2>
+<section id="id2">
+<h3>Objective<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>Understand what gets saved on stack during context switch and verify stack usage.</p>
+</section>
+<section id="id3">
+<h3>Tasks<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>Create tasks with different stack content</p></li>
+<li><p>Dump stack before/after context switch</p></li>
+<li><p>Identify saved register values</p></li>
+<li><p>Calculate actual stack usage per switch</p></li>
+<li><p>Verify overflow detection works</p></li>
+</ol>
+</section>
+</section>
+<section id="exercise-3-optimizing-context-switch-frequency">
+<h2>Exercise 3 - Optimizing Context Switch Frequency<a class="headerlink" href="#exercise-3-optimizing-context-switch-frequency" title="Link to this heading">¶</a></h2>
+<section id="id4">
+<h3>Objective<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<p>Reduce context switch overhead by batching operations.</p>
+</section>
+<section id="id5">
+<h3>Tasks<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>Implement high-frequency data acquisition (1kHz)</p></li>
+<li><p>Measure baseline context switch count</p></li>
+<li><p>Implement batching to reduce switches</p></li>
+<li><p>Compare CPU overhead before/after</p></li>
+<li><p>Measure improvement in throughput</p></li>
+</ol>
+</section>
+</section>
+<section id="solutions">
+<h2>Solutions<a class="headerlink" href="#solutions" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-04-solutions-context-switching">
+<h1>Day 04 Solutions - Context Switching<a class="headerlink" href="#day-04-solutions-context-switching" title="Link to this heading">¶</a></h1>
+<section id="solution-1-timing-measurement">
+<h2>Solution 1 - Timing Measurement<a class="headerlink" href="#solution-1-timing-measurement" title="Link to this heading">¶</a></h2>
+<p>Complete implementation with cycle-accurate measurements showing typical 12-25 cycles on Cortex-M4.</p>
+</section>
+<section id="solution-2-stack-analysis">
+<h2>Solution 2 - Stack Analysis<a class="headerlink" href="#solution-2-stack-analysis" title="Link to this heading">¶</a></h2>
+<p>Detailed stack dump showing register save areas and proper functioning of stack overflow detection.</p>
+</section>
+<section id="solution-3-optimization">
+<h2>Solution 3 - Optimization<a class="headerlink" href="#solution-3-optimization" title="Link to this heading">¶</a></h2>
+<p>Batching implementation reducing context switches from 1000/sec to 10/sec with negligible latency impact.</p>
+</section>
+<section id="navigation">
+<h2>Navigation<a class="headerlink" href="#navigation" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="day03.html"><span class="doc">Previous (03)</span></a></p></li>
+<li><p><a class="reference internal" href="day05.html"><span class="doc">Next (05)</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Daily Learning Path</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="day01.html">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#id1">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-lesson-introduction-to-real-time-operating-systems">Day 01 Lesson - Introduction to Real-Time Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-exercises-introduction-to-rtos">Day 01 Exercises - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-solutions-introduction-to-rtos">Day 01 Solutions - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#id1">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-lesson-tasks-and-threads">Day 02 Lesson - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-exercises-tasks-and-threads">Day 02 Exercises - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-solutions-tasks-and-threads">Day 02 Solutions - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#id1">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-lesson-scheduling-and-determinism">Day 03 Lesson - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-exercises-scheduling-and-determinism">Day 03 Exercises - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-solutions-scheduling-and-determinism">Day 03 Solutions - Scheduling and Determinism</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-04-lesson-context-switching">Day 04 Lesson - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-04-exercises-context-switching">Day 04 Exercises - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-04-solutions-context-switching">Day 04 Solutions - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#id1">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-lesson-semaphores-and-mutexes">Day 05 Lesson - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-exercises-semaphores-and-mutexes">Day 05 Exercises - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-solutions-semaphores-and-mutexes">Day 05 Solutions - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#id1">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-lesson-queues-and-event-groups">Day 06 Lesson - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-exercises-queues-and-event-groups">Day 06 Exercises - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-solutions-queues-and-event-groups">Day 06 Solutions - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#id1">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-lesson-interrupt-handling-with-rtos">Day 07 Lesson - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-exercises-interrupt-handling-with-rtos">Day 07 Exercises - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-solutions-interrupt-handling-with-rtos">Day 07 Solutions - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#id1">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-lesson-memory-and-stack-management">Day 08 Lesson - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-exercises-memory-and-stack-management">Day 08 Exercises - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day08.html#day-08-solutions-memory-and-stack-management">Day 08 Solutions - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#id1">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-lesson-latency-jitter-and-timing-analysis">Day 09 Lesson - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-exercises-latency-jitter-and-timing-analysis">Day 09 Exercises - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-solutions-latency-jitter-and-timing-analysis">Day 09 Solutions - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#id1">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-lesson-build-systems-ports-and-board-bringup">Day 10 Lesson - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-exercises-build-systems-ports-and-board-bringup">Day 10 Exercises - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-solutions-build-systems-ports-and-board-bringup">Day 10 Solutions - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#id1">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-lesson-freertos-deep-dive">Day 11 Lesson - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-exercises-freertos-deep-dive">Day 11 Exercises - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-solutions-freertos-deep-dive">Day 11 Solutions - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#id1">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-lesson-zephyr-rtos">Day 12 Lesson - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-exercises-zephyr-rtos">Day 12 Exercises - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-solutions-zephyr-rtos">Day 12 Solutions - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#id1">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-lesson-chibios">Day 13 Lesson - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-exercises-chibios">Day 13 Exercises - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-solutions-chibios">Day 13 Solutions - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#id1">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-lesson-threadx-azure-rtos">Day 14 Lesson - ThreadX (Azure RTOS)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-exercises-threadx">Day 14 Exercises - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-solutions-threadx">Day 14 Solutions - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html#id1">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html#id1">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html#id1">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html#id1">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#id1">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-lesson-rtos-comparison-and-selection">Day 19 Lesson - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-exercises-rtos-comparison-and-selection">Day 19 Exercises - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-solutions-rtos-comparison-and-selection">Day 19 Solutions - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#id1">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-lesson-final-project">Day 20 Lesson - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-exercises-final-project">Day 20 Exercises - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-solutions-final-project">Day 20 Solutions - Final Project</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Daily Learning Path</a><ul>
+      <li>Previous: <a href="day03.html" title="previous chapter">Day 03 - Scheduling and Determinism</a></li>
+      <li>Next: <a href="day05.html" title="next chapter">Day 05 - Semaphores and Mutexes</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/days/day04.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

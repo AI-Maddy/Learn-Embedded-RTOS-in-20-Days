@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Interrupt Handling &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="interrupt-handling">
+<h1>Interrupt Handling<a class="headerlink" href="#interrupt-handling" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>Interrupts</strong> are critical to real-time systems, enabling immediate response to hardware events. In an RTOS context, proper interrupt handling requires understanding:</p>
+<ul class="simple">
+<li><p>Interrupt priorities and nesting</p></li>
+<li><p>ISR constraints and best practices</p></li>
+<li><p>Deferred interrupt processing</p></li>
+<li><p>Integration with RTOS scheduler</p></li>
+</ul>
+<p>This guide covers how to handle interrupts effectively in RTOS-based systems.</p>
+</section>
+<section id="interrupt-fundamentals">
+<h2>Interrupt Fundamentals<a class="headerlink" href="#interrupt-fundamentals" title="Link to this heading">¶</a></h2>
+<section id="what-are-interrupts">
+<h3>What Are Interrupts?<a class="headerlink" href="#what-are-interrupts" title="Link to this heading">¶</a></h3>
+<p>An <strong>interrupt</strong> is a hardware signal that temporarily halts normal program execution to handle a time-critical event.</p>
+<p><strong>Types:</strong>
+- <strong>Hardware interrupts</strong>: External events (UART, GPIO, timers)
+- <strong>Software interrupts</strong>: Triggered by software (system calls, exceptions)
+- <strong>Exceptions</strong>: Error conditions (bus faults, divide by zero)</p>
+</section>
+<section id="interrupt-service-routine-isr">
+<h3>Interrupt Service Routine (ISR)<a class="headerlink" href="#interrupt-service-routine-isr" title="Link to this heading">¶</a></h3>
+<p>The <strong>ISR</strong> (or interrupt handler) is the function that executes when an interrupt occurs.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Simple ISR example (ARM Cortex-M)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">UART1_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Check interrupt source</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">UART1</span><span class="o">-&gt;</span><span class="n">SR</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">UART_SR_RXNE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Read received character</span>
+<span class="w">        </span><span class="kt">char</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UART1</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+
+<span class="w">        </span><span class="c1">// Process or queue for later</span>
+<span class="w">        </span><span class="n">buffer</span><span class="p">[</span><span class="n">write_idx</span><span class="o">++</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">c</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="interrupt-latency">
+<h3>Interrupt Latency<a class="headerlink" href="#interrupt-latency" title="Link to this heading">¶</a></h3>
+<p><strong>Interrupt latency</strong> is the time from interrupt assertion to ISR execution start.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Event occurs → Interrupt latency → ISR starts → ISR executes → ISR ends
+               ├─────────────────┤
+                     Latency
+</pre></div>
+</div>
+<p><strong>Components:</strong>
+1. Hardware detection time
+2. Instruction completion time
+3. Context saving time
+4. Interrupt priority arbitration</p>
+<p>Typical latency: <strong>1-20 microseconds</strong> depending on architecture and configuration.</p>
+</section>
+</section>
+<section id="interrupt-priorities">
+<h2>Interrupt Priorities<a class="headerlink" href="#interrupt-priorities" title="Link to this heading">¶</a></h2>
+<section id="priority-levels">
+<h3>Priority Levels<a class="headerlink" href="#priority-levels" title="Link to this heading">¶</a></h3>
+<p>Most architectures support multiple interrupt priority levels. Higher priority interrupts can preempt lower priority ones.</p>
+<p>ARM Cortex-M Example:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure interrupt priorities0-15 (0 = highest)</span>
+<span class="n">NVIC_SetPriority</span><span class="p">(</span><span class="n">UART1_IRQn</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">);</span><span class="w">   </span><span class="c1">// Medium priority</span>
+<span class="n">NVIC_SetPriority</span><span class="p">(</span><span class="n">TIMER1_IRQn</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w">  </span><span class="c1">// High priority</span>
+<span class="n">NVIC_SetPriority</span><span class="p">(</span><span class="n">ADC1_IRQn</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">);</span><span class="w">   </span><span class="c1">// Low priority</span>
+
+<span class="c1">// Enable interrupts</span>
+<span class="n">NVIC_EnableIRQ</span><span class="p">(</span><span class="n">UART1_IRQn</span><span class="p">);</span>
+<span class="n">NVIC_EnableIRQ</span><span class="p">(</span><span class="n">TIMER1_IRQn</span><span class="p">);</span>
+<span class="n">NVIC_EnableIRQ</span><span class="p">(</span><span class="n">ADC1_IRQn</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-guidelines">
+<h3>Priority Guidelines<a class="headerlink" href="#priority-guidelines" title="Link to this heading">¶</a></h3>
+<p><strong>Assign higher priorities to:</strong>
+- Time-critical events (safety, control loops)
+- Events with tight deadlines
+- Events that occur rarely</p>
+<p><strong>Assign lower priorities to:</strong>
+- Less time-critical events
+- Events that can tolerate latency
+- High-frequency events (to reduce overhead)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Priority assignment example</span>
+<span class="cp">#define IRQ_PRIORITY_CRITICAL    0  </span><span class="c1">// Safety interlock</span>
+<span class="cp">#define IRQ_PRIORITY_HIGH        3  </span><span class="c1">// Motor control</span>
+<span class="cp">#define IRQ_PRIORITY_MEDIUM      5  </span><span class="c1">// UART comms</span>
+<span class="cp">#define IRQ_PRIORITY_LOW         10 </span><span class="c1">// Status LED</span>
+<span class="cp">#define IRQ_PRIORITY_RTOS        15 </span><span class="c1">// RTOS tick/syscalls</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="rtos-integration">
+<h2>RTOS Integration<a class="headerlink" href="#rtos-integration" title="Link to this heading">¶</a></h2>
+<section id="interrupt-priorities-and-rtos">
+<h3>Interrupt Priorities and RTOS<a class="headerlink" href="#interrupt-priorities-and-rtos" title="Link to this heading">¶</a></h3>
+<p>Most RTOSes use a <strong>syscall priority threshold</strong>: interrupts above this priority cannot call RTOS APIs.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS configuration</span>
+<span class="cp">#define configMAX_SYSCALL_INTERRUPT_PRIORITY  5</span>
+
+<span class="c1">// Priority 0-4: Cannot call FreeRTOS APIs</span>
+<span class="c1">// Priority 5-15: Can call FreeRTOS &quot;FromISR&quot; APIs</span>
+</pre></div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Priority
+────────
+   0    ┐
+   1    │ High-priority ISRs
+   2    │ (Cannot use RTOS APIs)
+   3    │ Minimal latency
+   4    ┘
+─────────── configMAX_SYSCALL_INTERRUPT_PRIORITY
+   5    ┐
+   6    │ RTOS-aware ISRs
+   7    │ (Can call *FromISR APIs)
+   8    ┘
+─────────── RTOS kernel priority
+  15        (SysTick, PendSV, etc.)
+</pre></div>
+</div>
+</section>
+<section id="safe-isr-calls">
+<h3>Safe ISR Calls<a class="headerlink" href="#safe-isr-calls" title="Link to this heading">¶</a></h3>
+<p><strong>From high-priority ISRs (above threshold):</strong>
+- Set flags
+- Write to hardware registers
+- Minimal processing only</p>
+<p><strong>From RTOS-aware ISRs:</strong>
+- Call <a href="#id1"><span class="problematic" id="id2">*</span></a>FromISR APIs
+- Signal semaphores
+- Send to queues
+- Notify tasks</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// High-priority ISR (priority &lt; configMAX_SYSCALL_INTERRUPT_PRIORITY)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">CRITICAL_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Can ONLY do direct operations</span>
+<span class="w">    </span><span class="n">critical_flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">EMERGENCY_PIN</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// NO RTOS calls allowed!</span>
+<span class="p">}</span>
+
+<span class="c1">// RTOS-aware ISR (priority &gt;= configMAX_SYSCALL_INTERRUPT_PRIORITY)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UART</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Safe to call FromISR APIs</span>
+<span class="w">    </span><span class="n">xQueueSendFromISR</span><span class="p">(</span><span class="n">uart_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">c</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Yield if higher-priority task woken</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="isr-constraints">
+<h2>ISR Constraints<a class="headerlink" href="#isr-constraints" title="Link to this heading">¶</a></h2>
+<section id="what-not-to-do-in-isrs">
+<h3>What NOT To Do in ISRs<a class="headerlink" href="#what-not-to-do-in-isrs" title="Link to this heading">¶</a></h3>
+<p><strong>NEVER:</strong>
+- Call blocking functions (<code class="docutils literal notranslate"><span class="pre">xQueueSend</span></code> without <code class="docutils literal notranslate"><span class="pre">FromISR</span></code>)
+- Use floating-point operations (unless context saved)
+- Call <code class="docutils literal notranslate"><span class="pre">printf</span></code> or complex library functions
+- Allocate/free memory
+- Take a long time (&gt; 100 µs guideline)</p>
+<p><strong>Why?</strong>
+- Blocks real-time response
+- Increases jitter
+- May corrupts RTOS state
+- Causes priority inversion</p>
+</section>
+<section id="best-practices">
+<h3>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Keep ISRs short</strong>: Defer work to tasks</p></li>
+<li><p><strong>Use FromISR variants</strong>: Always in RTOS context</p></li>
+<li><p><strong>Check return values</strong>: Handle failures gracefully</p></li>
+<li><p><strong>Clear interrupt flags</strong>: Prevent repeated triggering</p></li>
+<li><p><strong>Use volatile</strong>: For shared variables</p></li>
+</ol>
+</section>
+</section>
+<section id="deferred-interrupt-processing">
+<h2>Deferred Interrupt Processing<a class="headerlink" href="#deferred-interrupt-processing" title="Link to this heading">¶</a></h2>
+<section id="the-two-stage-approach">
+<h3>The Two-Stage Approach<a class="headerlink" href="#the-two-stage-approach" title="Link to this heading">¶</a></h3>
+<p><strong>Stage 1: ISR (fast)</strong>
+- Acknowledge interrupt
+- Read hardware registers
+- Signal RTOS primitive
+- Exit quickly</p>
+<p><strong>Stage 2: Task (deferred)</strong>
+- Process data
+- Perform complex operations
+- Can block if needed</p>
+</section>
+<section id="pattern-1-binary-semaphore">
+<h3>Pattern 1: Binary Semaphore<a class="headerlink" href="#pattern-1-binary-semaphore" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">isr_semaphore</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Quick: just signal the task</span>
+<span class="w">    </span><span class="n">xSemaphoreGiveFromISR</span><span class="p">(</span><span class="n">isr_semaphore</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">deferred_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for ISR signal</span>
+<span class="w">        </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">isr_semaphore</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Do the heavy lifting here</span>
+<span class="w">        </span><span class="n">complex_processing</span><span class="p">();</span>
+<span class="w">        </span><span class="n">update_state_machine</span><span class="p">();</span>
+<span class="w">        </span><span class="n">log_event</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-2-queue">
+<h3>Pattern 2: Queue<a class="headerlink" href="#pattern-2-queue" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">isr_queue</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">adc_value</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">channel</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">adc_reading_t</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">ADC_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">adc_reading_t</span><span class="w"> </span><span class="n">reading</span><span class="p">;</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Read hardware</span>
+<span class="w">    </span><span class="n">reading</span><span class="p">.</span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+<span class="w">    </span><span class="n">reading</span><span class="p">.</span><span class="n">adc_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ADC1</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">reading</span><span class="p">.</span><span class="n">channel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Queue it</span>
+<span class="w">    </span><span class="n">xQueueSendFromISR</span><span class="p">(</span><span class="n">isr_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">reading</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">adc_processing_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">adc_reading_t</span><span class="w"> </span><span class="n">reading</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">isr_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">reading</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Process in task context</span>
+<span class="w">            </span><span class="kt">float</span><span class="w"> </span><span class="n">voltage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">adc_to_voltage</span><span class="p">(</span><span class="n">reading</span><span class="p">.</span><span class="n">adc_value</span><span class="p">);</span>
+<span class="w">            </span><span class="n">apply_filtering</span><span class="p">(</span><span class="n">voltage</span><span class="p">);</span>
+<span class="w">            </span><span class="n">update_display</span><span class="p">(</span><span class="n">voltage</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-3-task-notification">
+<h3>Pattern 3: Task Notification<a class="headerlink" href="#pattern-3-task-notification" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">processing_task_handle</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Lightweight notification</span>
+<span class="w">    </span><span class="n">vTaskNotifyGiveFromISR</span><span class="p">(</span><span class="n">processing_task_handle</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">processing_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for notification</span>
+<span class="w">        </span><span class="n">ulTaskNotifyTake</span><span class="p">(</span><span class="n">pdTRUE</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Handle event</span>
+<span class="w">        </span><span class="n">process_interrupt_event</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="pattern-4-deferred-interrupt-work-queue">
+<h3>Pattern 4: Deferred Interrupt Work Queue<a class="headerlink" href="#pattern-4-deferred-interrupt-work-queue" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">deferred_func_t</span><span class="p">)(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">);</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">deferred_func_t</span><span class="w"> </span><span class="n">function</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">work_item_t</span><span class="p">;</span>
+
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">work_queue</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">schedule_work</span><span class="p">(</span><span class="n">deferred_func_t</span><span class="w"> </span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">work_item_t</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">function</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">func</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">param</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">param</span><span class="w"> </span><span class="p">};</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">xQueueSendFromISR</span><span class="p">(</span><span class="n">work_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">item</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">worker_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">work_item_t</span><span class="w"> </span><span class="n">item</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">work_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">item</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">item</span><span class="p">.</span><span class="n">function</span><span class="p">(</span><span class="n">item</span><span class="p">.</span><span class="n">param</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Usage in ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">process_uart</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="p">(</span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">param</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Complex processing here</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="n">received</span><span class="p">;</span>
+<span class="w">    </span><span class="n">received</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UART</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">schedule_work</span><span class="p">(</span><span class="n">process_uart</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="interrupt-nesting">
+<h2>Interrupt Nesting<a class="headerlink" href="#interrupt-nesting" title="Link to this heading">¶</a></h2>
+<p>Nested interrupts occur when a higher-priority interrupt preempts a lower-priority ISR.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Task running
+    │
+    ├──► Low-priority ISR starts
+    │        │
+    │        ├──► High-priority ISR preempts
+    │        │        │
+    │        │        └──► High-priority ISR completes
+    │        │
+    │        └──► Low-priority ISR resumes and completes
+    │
+    └──► Task resumes
+</pre></div>
+</div>
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Enable interrupt nesting (ARM Cortex-M)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">init_interrupts</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Set priority grouping (4 bits for preempt, 0 for sub)</span>
+<span class="w">    </span><span class="n">NVIC_SetPriorityGrouping</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Configure priorities</span>
+<span class="w">    </span><span class="n">NVIC_SetPriority</span><span class="p">(</span><span class="n">HIGH_PRIORITY_IRQ</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">NVIC_SetPriority</span><span class="p">(</span><span class="n">LOW_PRIORITY_IRQ</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">NVIC_EnableIRQ</span><span class="p">(</span><span class="n">HIGH_PRIORITY_IRQ</span><span class="p">);</span>
+<span class="w">    </span><span class="n">NVIC_EnableIRQ</span><span class="p">(</span><span class="n">LOW_PRIORITY_IRQ</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="shared-data-between-isrs-and-tasks">
+<h2>Shared Data Between ISRs and Tasks<a class="headerlink" href="#shared-data-between-isrs-and-tasks" title="Link to this heading">¶</a></h2>
+<section id="volatile-keyword">
+<h3>Volatile Keyword<a class="headerlink" href="#volatile-keyword" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">volatile</span></code> for variables shared between ISRs and tasks:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">interrupt_counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">volatile</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">data_ready</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">interrupt_counter</span><span class="o">++</span><span class="p">;</span><span class="w">  </span><span class="c1">// Compiler won&#39;t optimize away</span>
+<span class="w">    </span><span class="n">data_ready</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">data_ready</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">data_ready</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">            </span><span class="c1">// Process</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="atomic-operations">
+<h3>Atomic Operations<a class="headerlink" href="#atomic-operations" title="Link to this heading">¶</a></h3>
+<p>For multi-byte accesses, use critical sections:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">shared_value</span><span class="p">;</span>
+
+<span class="c1">// In task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">local_copy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shared_value</span><span class="p">;</span>
+<span class="w">    </span><span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Use local_copy safely</span>
+<span class="p">}</span>
+
+<span class="c1">// In ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// ISRs automatically run with appropriate masking</span>
+<span class="w">    </span><span class="n">shared_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_value</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="circular-buffers">
+<h3>Circular Buffers<a class="headerlink" href="#circular-buffers" title="Link to this heading">¶</a></h3>
+<p>Efficient ISR-to-task communication:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define BUFFER_SIZE 128</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">buffer</span><span class="p">[</span><span class="n">BUFFER_SIZE</span><span class="p">];</span>
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">head</span><span class="p">;</span>
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">tail</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">circular_buffer_t</span><span class="p">;</span>
+
+<span class="n">circular_buffer_t</span><span class="w"> </span><span class="n">uart_buffer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span>
+
+<span class="c1">// In ISR: add data</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UART</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">next_head</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">head</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">BUFFER_SIZE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">next_head</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">tail</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">buffer</span><span class="p">[</span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">head</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">c</span><span class="p">;</span>
+<span class="w">        </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">head</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">next_head</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// In task: read data</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">buffer_read</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">head</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">tail</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">  </span><span class="c1">// Empty</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="o">*</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">buffer</span><span class="p">[</span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">tail</span><span class="p">];</span>
+<span class="w">    </span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">tail</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">uart_buffer</span><span class="p">.</span><span class="n">tail</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">BUFFER_SIZE</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-optimization">
+<h2>Performance Optimization<a class="headerlink" href="#performance-optimization" title="Link to this heading">¶</a></h2>
+<section id="minimize-isr-duration">
+<h3>Minimize ISR Duration<a class="headerlink" href="#minimize-isr-duration" title="Link to this heading">¶</a></h3>
+<p>Measure ISR execution time:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">DEBUG_PIN</span><span class="p">);</span><span class="w">  </span><span class="c1">// Set at ISR start</span>
+
+<span class="w">    </span><span class="c1">// ISR code here</span>
+
+<span class="w">    </span><span class="n">GPIO_CLEAR</span><span class="p">(</span><span class="n">DEBUG_PIN</span><span class="p">);</span><span class="w">  </span><span class="c1">// Clear at ISR end</span>
+<span class="p">}</span>
+<span class="c1">// Measure pulse width with scope/logic analyzer</span>
+</pre></div>
+</div>
+</section>
+<section id="batch-processing">
+<h3>Batch Processing<a class="headerlink" href="#batch-processing" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define BATCH_SIZE 16</span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">batch_buffer</span><span class="p">[</span><span class="n">BATCH_SIZE</span><span class="p">];</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">batch_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">batch_buffer</span><span class="p">[</span><span class="n">batch_count</span><span class="o">++</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_hardware</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">batch_count</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">BATCH_SIZE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Signal task to process batch</span>
+<span class="w">        </span><span class="n">xSemaphoreGiveFromISR</span><span class="p">(</span><span class="n">batch_ready_sem</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">        </span><span class="n">batch_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Forgetting to clear interrupt flag</strong> → Repeated ISR calls</p></li>
+<li><p><strong>Using non-FromISR RTOS calls</strong> → System crash</p></li>
+<li><p><strong>Long ISRs</strong> → Increased jitter and latency</p></li>
+<li><p><strong>Missing volatile</strong> → Compiler optimization bugs</p></li>
+<li><p><strong>Priority inversion</strong> → High-priority ISR blocked</p></li>
+</ol>
+</section>
+<section id="debugging-isrs">
+<h2>Debugging ISRs<a class="headerlink" href="#debugging-isrs" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// ISR execution counter</span>
+<span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">isr_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">isr_max_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">isr_count</span><span class="o">++</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// ISR work here</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">duration</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">isr_max_duration</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">isr_max_duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">duration</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="best-practices-summary">
+<h2>Best Practices Summary<a class="headerlink" href="#best-practices-summary" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Keep ISRs minimal</strong> (&lt; 10-20 µs)</p></li>
+<li><p><strong>Defer processing</strong> to tasks</p></li>
+<li><p><strong>Use FromISR APIs</strong> exclusively</p></li>
+<li><p><strong>Configure priorities</strong> carefully</p></li>
+<li><p><strong>Protect shared data</strong> with volatile/critical sections</p></li>
+<li><p><strong>Test under load</strong> to find worst-case behavior</p></li>
+<li><p><strong>Measure ISR timing</strong> with diagnostic pins</p></li>
+</ol>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day07.html"><span class="doc">Day 07 - Interrupt Handling with RTOS</span></a> - Interrupt Handling with RTOS</p></li>
+<li><p><a class="reference internal" href="synchronization.html"><span class="doc">Synchronization</span></a> - ISR-safe synchronization</p></li>
+<li><p><a class="reference internal" href="timing_analysis.html"><span class="doc">Timing Analysis</span></a> - Measuring interrupt latency</p></li>
+<li><p><a class="reference internal" href="rtos_basics.html"><span class="doc">RTOS Basics</span></a> - Task scheduling fundamentals</p></li>
+<li><p><a class="reference internal" href="../patterns/watchdog_fault_handling.html"><span class="doc">Watchdog and Fault Handling</span></a> - Fault handling</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>ARM Cortex-M Programming Guide</p></li>
+<li><p>“Embedded Systems Architecture” by Tammy Noergaard</p></li>
+<li><p>Interrupt handling in specific RTOS documentation</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/overview/interrupts.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

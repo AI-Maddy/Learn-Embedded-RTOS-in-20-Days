@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>State Machine Tasks &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="state-machine-tasks">
+<h1>State Machine Tasks<a class="headerlink" href="#state-machine-tasks" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>State machines</strong> are fundamental to embedded systems, modeling behavior that changes over time based on events. Implementing state machines as RTOS tasks combines the clarity of states with the benefits of concurrent execution.</p>
+<p><strong>Benefits:</strong>
+- Clear, maintainable code structure
+- Event-driven behavior
+- Timeout handling built-in
+- Easy to test and debug</p>
+</section>
+<section id="pattern-overview">
+<h2>Pattern Overview<a class="headerlink" href="#pattern-overview" title="Link to this heading">¶</a></h2>
+<section id="state-machine-basics">
+<h3>State Machine Basics<a class="headerlink" href="#state-machine-basics" title="Link to this heading">¶</a></h3>
+<p>A state machine consists of:</p>
+<ul class="simple">
+<li><p><strong>States</strong>: Distinct modes of operation</p></li>
+<li><p><strong>Events</strong>: Triggers that cause transitions</p></li>
+<li><p><strong>Transitions</strong>: Changes from one state to another</p></li>
+<li><p><strong>Actions</strong>: Code executed on transitions or in states</p></li>
+</ul>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌─────────┐   Event A   ┌─────────┐
+│ State 1 ├────────────►│ State 2 │
+└────┬────┘             └────┬────┘
+     │                       │
+     │ Event B               │ Event C
+     │                       │
+     ▼                       ▼
+┌─────────┐             ┌─────────┐
+│ State 3 │◄────────────│ State 4 │
+└─────────┘   Event D   └─────────┘
+</pre></div>
+</div>
+</section>
+</section>
+<section id="simple-switch-based-implementation">
+<h2>Simple Switch-Based Implementation<a class="headerlink" href="#simple-switch-based-implementation" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;FreeRTOS.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;task.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;queue.h&quot;</span>
+
+<span class="c1">// States</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">STATE_IDLE</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_RUNNING</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_PAUSED</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_ERROR</span>
+<span class="p">}</span><span class="w"> </span><span class="n">system_state_t</span><span class="p">;</span>
+
+<span class="c1">// Events</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">EVENT_START</span><span class="p">,</span>
+<span class="w">    </span><span class="n">EVENT_STOP</span><span class="p">,</span>
+<span class="w">    </span><span class="n">EVENT_PAUSE</span><span class="p">,</span>
+<span class="w">    </span><span class="n">EVENT_RESUME</span><span class="p">,</span>
+<span class="w">    </span><span class="n">EVENT_ERROR</span>
+<span class="p">}</span><span class="w"> </span><span class="n">system_event_t</span><span class="p">;</span>
+
+<span class="c1">// State machine context</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">current_state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">error_count</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">state_machine_t</span><span class="p">;</span>
+
+<span class="n">state_machine_t</span><span class="w"> </span><span class="n">sm</span><span class="p">;</span>
+
+<span class="c1">// State machine task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">state_machine_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">sm</span><span class="p">.</span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for event</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">sm</span><span class="p">.</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">            </span><span class="c1">// Process event based on current state</span>
+<span class="w">            </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_IDLE</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_START</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;IDLE -&gt; RUNNING</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_RUNNING</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">start_operation</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_RUNNING</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;RUNNING -&gt; IDLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">stop_operation</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_PAUSE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;RUNNING -&gt; PAUSED</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_PAUSED</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">pause_operation</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_ERROR</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;RUNNING -&gt; ERROR</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_ERROR</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">handle_error</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_PAUSED</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_RESUME</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;PAUSED -&gt; RUNNING</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_RUNNING</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">resume_operation</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;PAUSED -&gt; IDLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">stop_operation</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_ERROR</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;ERROR -&gt; IDLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                        </span><span class="n">sm</span><span class="p">.</span><span class="n">current_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">clear_error</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Event injection from other tasks/ISRs</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">send_event</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">sm</span><span class="p">.</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="function-pointer-table-implementation">
+<h2>Function Pointer Table Implementation<a class="headerlink" href="#function-pointer-table-implementation" title="Link to this heading">¶</a></h2>
+<p>More scalable for complex state machines:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// State handler function type</span>
+<span class="k">typedef</span><span class="w"> </span><span class="n">system_state_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">state_handler_t</span><span class="p">)(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+
+<span class="c1">// State handler declarations</span>
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">idle_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">running_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">paused_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">error_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+
+<span class="c1">// State table</span>
+<span class="n">state_handler_t</span><span class="w"> </span><span class="n">state_table</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_IDLE</span><span class="p">]</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">idle_handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_RUNNING</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">running_handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_PAUSED</span><span class="p">]</span><span class="w">  </span><span class="o">=</span><span class="w"> </span><span class="n">paused_handler</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_ERROR</span><span class="p">]</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">error_handler</span>
+<span class="p">};</span>
+
+<span class="c1">// State handlers</span>
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">idle_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_START</span><span class="p">:</span>
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Starting system</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">            </span><span class="n">start_operation</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_RUNNING</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">default</span><span class="o">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span><span class="w">  </span><span class="c1">// Ignore other events</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">running_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_STOP</span><span class="p">:</span>
+<span class="w">            </span><span class="n">stop_operation</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_PAUSE</span><span class="p">:</span>
+<span class="w">            </span><span class="n">pause_operation</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_PAUSED</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_ERROR</span><span class="p">:</span>
+<span class="w">            </span><span class="n">handle_error</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_ERROR</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">default</span><span class="o">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_RUNNING</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">paused_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_RESUME</span><span class="p">:</span>
+<span class="w">            </span><span class="n">resume_operation</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_RUNNING</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_STOP</span><span class="p">:</span>
+<span class="w">            </span><span class="n">stop_operation</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">default</span><span class="o">:</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_PAUSED</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">system_state_t</span><span class="w"> </span><span class="nf">error_handler</span><span class="p">(</span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">case</span><span class="w"> </span><span class="no">EVENT_STOP</span><span class="p">:</span>
+<span class="w">            </span><span class="n">clear_error</span><span class="p">();</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">default</span><span class="o">:</span>
+<span class="w">            </span><span class="c1">// Stay in error until explicitly cleared</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">STATE_ERROR</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// State machine task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">state_machine_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Call current state handler</span>
+<span class="w">            </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">state_table</span><span class="p">[</span><span class="n">state</span><span class="p">](</span><span class="n">event</span><span class="p">);</span>
+
+<span class="w">            </span><span class="c1">// Log transition if state changed</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">new_state</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;State transition: %d -&gt; %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">);</span>
+<span class="w">                </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_state</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="hierarchical-state-machine">
+<h2>Hierarchical State Machine<a class="headerlink" href="#hierarchical-state-machine" title="Link to this heading">¶</a></h2>
+<p>For complex systems with nested states:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Top-level states</span>
+<span class="w">    </span><span class="n">STATE_SYSTEM_OFF</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_SYSTEM_ON</span><span class="p">,</span>
+
+<span class="w">    </span><span class="c1">// Sub-states of SYSTEM_ON</span>
+<span class="w">    </span><span class="n">STATE_ON_INITIALIZING</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_ON_READY</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_ON_ACTIVE</span><span class="p">,</span>
+<span class="w">    </span><span class="n">STATE_ON_SHUTTING_DOWN</span>
+<span class="p">}</span><span class="w"> </span><span class="n">hierarchical_state_t</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">hierarchical_state_t</span><span class="w"> </span><span class="n">state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">hierarchical_state_t</span><span class="w"> </span><span class="n">parent_state</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">hsm_context_t</span><span class="p">;</span>
+
+<span class="n">hsm_context_t</span><span class="w"> </span><span class="n">hsm</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">hsm_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_SYSTEM_OFF</span><span class="p">;</span>
+<span class="w">    </span><span class="n">hsm</span><span class="p">.</span><span class="n">parent_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_SYSTEM_OFF</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">            </span><span class="c1">// Handle event based on current state</span>
+<span class="w">            </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_SYSTEM_OFF</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_START</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_ON_INITIALIZING</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">parent_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_SYSTEM_ON</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">initialize_system</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_ON_INITIALIZING</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_INIT_COMPLETE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_ON_READY</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="c1">// Parent state handler</span>
+<span class="w">                        </span><span class="k">goto</span><span class="w"> </span><span class="n">handle_system_on</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_ON_READY</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_START</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_ON_ACTIVE</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">start_processing</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="k">goto</span><span class="w"> </span><span class="n">handle_system_on</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_ON_ACTIVE</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_PAUSE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_ON_READY</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">pause_processing</span><span class="p">();</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_STOP</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="k">goto</span><span class="w"> </span><span class="n">handle_system_on</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">STATE_ON_SHUTTING_DOWN</span><span class="p">:</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">EVENT_SHUTDOWN_COMPLETE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_SYSTEM_OFF</span><span class="p">;</span>
+<span class="w">                        </span><span class="n">hsm</span><span class="p">.</span><span class="n">parent_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_SYSTEM_OFF</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+
+<span class="w">            </span><span class="k">continue</span><span class="p">;</span>
+</pre></div>
+</div>
+<dl>
+<dt>handle_system_on:</dt><dd><blockquote>
+<div><blockquote>
+<div><blockquote>
+<div><p>// Common handler for all SYSTEM_ON sub-states
+if (event == EVENT_STOP) {</p>
+<blockquote>
+<div><p>hsm.state = STATE_ON_SHUTTING_DOWN;
+shutdown_system();</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</dd>
+</dl>
+</section>
+<section id="state-machine-with-timeouts">
+<h2>State Machine with Timeouts<a class="headerlink" href="#state-machine-with-timeouts" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">state_entry_time</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">timeout_ms</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">timed_state_machine_t</span><span class="p">;</span>
+
+<span class="n">timed_state_machine_t</span><span class="w"> </span><span class="n">tsm</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">timed_state_machine_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">tsm</span><span class="p">.</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tsm</span><span class="p">.</span><span class="n">state_entry_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="n">tsm</span><span class="p">.</span><span class="n">timeout_ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Calculate timeout for current state</span>
+<span class="w">        </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">tsm</span><span class="p">.</span><span class="n">timeout_ms</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">elapsed</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">tsm</span><span class="p">.</span><span class="n">state_entry_time</span><span class="p">;</span>
+<span class="w">            </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">timeout_ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="n">tsm</span><span class="p">.</span><span class="n">timeout_ms</span><span class="p">);</span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">elapsed</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">timeout_ticks</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">timeout_ticks</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">elapsed</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Timeout occurred</span>
+<span class="w">                </span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EVENT_TIMEOUT</span><span class="p">;</span>
+<span class="w">                </span><span class="k">goto</span><span class="w"> </span><span class="n">process_event</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// Wait for event or timeout</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EVENT_TIMEOUT</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+</pre></div>
+</div>
+<dl>
+<dt>process_event:</dt><dd><blockquote>
+<div><blockquote>
+<div><p>system_state_t old_state = tsm.state;</p>
+<dl>
+<dt>switch (tsm.state) {</dt><dd><dl>
+<dt>case STATE_IDLE:</dt><dd><dl class="simple">
+<dt>if (event == EVENT_START) {</dt><dd><p>tsm.state = STATE_RUNNING;
+tsm.timeout_ms = 5000;  // 5 second timeout</p>
+</dd>
+</dl>
+<p>}
+break;</p>
+</dd>
+<dt>case STATE_RUNNING:</dt><dd><dl class="simple">
+<dt>if (event == EVENT_STOP) {</dt><dd><p>tsm.state = STATE_IDLE;
+tsm.timeout_ms = 0;</p>
+</dd>
+</dl>
+<p>}
+else if (event == EVENT_TIMEOUT) {</p>
+<blockquote>
+<div><p>printf(“Running state timeout - moving to errorn”);
+tsm.state = STATE_ERROR;
+tsm.timeout_ms = 10000;  // 10 second error timeout</p>
+</div></blockquote>
+<p>}
+break;</p>
+</dd>
+<dt>case STATE_ERROR:</dt><dd><dl class="simple">
+<dt>if (event == EVENT_STOP) {</dt><dd><p>tsm.state = STATE_IDLE;
+tsm.timeout_ms = 0;</p>
+</dd>
+</dl>
+<p>}
+else if (event == EVENT_TIMEOUT) {</p>
+<blockquote>
+<div><p>printf(“Error timeout - attempting recoveryn”);
+attempt_recovery();
+tsm.state = STATE_IDLE;
+tsm.timeout_ms = 0;</p>
+</div></blockquote>
+<p>}
+break;</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>}</p>
+<p>// Update entry time if state changed
+if (tsm.state != old_state) {</p>
+<blockquote>
+<div><p>tsm.state_entry_time = xTaskGetTickCount();
+printf(“State: %d -&gt; %dn”, old_state, tsm.state);</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</div></blockquote>
+<p>}</p>
+</dd>
+</dl>
+</section>
+<section id="guard-conditions-and-actions">
+<h2>Guard Conditions and Actions<a class="headerlink" href="#guard-conditions-and-actions" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">from_state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">to_state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">guard</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span><span class="w">        </span><span class="c1">// Condition to allow transition</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">action</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span><span class="w">       </span><span class="c1">// Action to perform on transition</span>
+<span class="p">}</span><span class="w"> </span><span class="n">transition_t</span><span class="p">;</span>
+
+<span class="c1">// Guard functions</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">battery_ok</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">get_battery_voltage</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">3.3f</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">temperature_normal</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">get_temperature</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Action functions</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">start_motor</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Starting motor</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">motor_enable</span><span class="p">(</span><span class="nb">true</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">stop_motor</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Stopping motor</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">motor_enable</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">log_error</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Error occurred</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">error_logger_add_entry</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Transition table</span>
+<span class="n">transition_t</span><span class="w"> </span><span class="n">transitions</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// from,         to,            event,       guard,            action</span>
+<span class="w">    </span><span class="p">{</span><span class="n">STATE_IDLE</span><span class="p">,</span><span class="w">     </span><span class="n">STATE_RUNNING</span><span class="p">,</span><span class="w"> </span><span class="n">EVENT_START</span><span class="p">,</span><span class="w"> </span><span class="n">battery_ok</span><span class="p">,</span><span class="w">       </span><span class="n">start_motor</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="n">STATE_RUNNING</span><span class="p">,</span><span class="w">  </span><span class="n">STATE_IDLE</span><span class="p">,</span><span class="w">    </span><span class="n">EVENT_STOP</span><span class="p">,</span><span class="w">  </span><span class="nb">NULL</span><span class="p">,</span><span class="w">             </span><span class="n">stop_motor</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="n">STATE_RUNNING</span><span class="p">,</span><span class="w">  </span><span class="n">STATE_ERROR</span><span class="p">,</span><span class="w">   </span><span class="n">EVENT_ERROR</span><span class="p">,</span><span class="w"> </span><span class="n">temperature_normal</span><span class="p">,</span><span class="w"> </span><span class="n">log_error</span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span><span class="n">STATE_ERROR</span><span class="p">,</span><span class="w">    </span><span class="n">STATE_IDLE</span><span class="p">,</span><span class="w">    </span><span class="n">EVENT_STOP</span><span class="p">,</span><span class="w">  </span><span class="nb">NULL</span><span class="p">,</span><span class="w">             </span><span class="nb">NULL</span><span class="p">},</span>
+<span class="p">};</span>
+
+<span class="cp">#define NUM_TRANSITIONS (sizeof(transitions) / sizeof(transition_t))</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">table_driven_state_machine_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">            </span><span class="c1">// Search for matching transition</span>
+<span class="w">            </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NUM_TRANSITIONS</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">transition_t</span><span class="w"> </span><span class="o">*</span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">transitions</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">from_state</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">event</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="c1">// Check guard condition</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">guard</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">guard</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="c1">// Transition allowed</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Transition: %d -&gt; %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">to_state</span><span class="p">);</span>
+
+<span class="w">                        </span><span class="c1">// Execute action</span>
+<span class="w">                        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">action</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                            </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">action</span><span class="p">();</span>
+<span class="w">                        </span><span class="p">}</span>
+
+<span class="w">                        </span><span class="c1">// Change state</span>
+<span class="w">                        </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">to_state</span><span class="p">;</span>
+<span class="w">                        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">                    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Transition blocked by guard</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="state-entry-exit-actions">
+<h2>State Entry/Exit Actions<a class="headerlink" href="#state-entry-exit-actions" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">on_entry</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">on_execute</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">on_exit</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span>
+<span class="p">}</span><span class="w"> </span><span class="n">state_actions_t</span><span class="p">;</span>
+
+<span class="c1">// State-specific actions</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">idle_on_entry</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Entering IDLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">leds_off</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">idle_on_execute</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Periodic work while in IDLE</span>
+<span class="w">    </span><span class="n">check_battery_level</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">idle_on_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Leaving IDLE</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">running_on_entry</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Entering RUNNING</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">start_motor</span><span class="p">();</span>
+<span class="w">    </span><span class="n">led_set</span><span class="p">(</span><span class="n">LED_GREEN</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">running_on_execute</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Periodic work while RUNNING</span>
+<span class="w">    </span><span class="n">monitor_motor_speed</span><span class="p">();</span>
+<span class="w">    </span><span class="n">monitor_temperature</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">running_on_exit</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Leaving RUNNING</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">stop_motor</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Action table</span>
+<span class="n">state_actions_t</span><span class="w"> </span><span class="n">state_actions</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_IDLE</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">idle_on_entry</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_execute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">idle_on_execute</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_exit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">idle_on_exit</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_RUNNING</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">running_on_entry</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_execute</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">running_on_execute</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">on_exit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">running_on_exit</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">state_machine_with_actions_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">STATE_IDLE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">event_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">system_event_t</span><span class="p">));</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">execute_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Call entry action for initial state</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_entry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_entry</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for event or timeout for execute action</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">event_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">execute_period</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Process event</span>
+<span class="w">            </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">process_event</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">new_state</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Call exit action</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_exit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_exit</span><span class="p">();</span>
+<span class="w">                </span><span class="p">}</span>
+
+<span class="w">                </span><span class="c1">// Change state</span>
+<span class="w">                </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_state</span><span class="p">;</span>
+
+<span class="w">                </span><span class="c1">// Call entry action</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_entry</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_entry</span><span class="p">();</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// Call execute action periodically</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_execute</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">state_actions</span><span class="p">[</span><span class="n">state</span><span class="p">].</span><span class="n">on_execute</span><span class="p">();</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Keep states simple</strong>: Each state should have a clear purpose</p></li>
+<li><p><strong>Document state diagram</strong>: Visual representation aids understanding</p></li>
+<li><p><strong>Use enums for states/events</strong>: Type safety and readability</p></li>
+<li><p><strong>Validate transitions</strong>: Log invalid event/state combinations</p></li>
+<li><p><strong>Handle all events</strong>: Define behavior for every state/event pair</p></li>
+<li><p><strong>Use timeouts</strong>: Recover from stuck states</p></li>
+<li><p><strong>Test all paths</strong>: Cover all state transitions</p></li>
+<li><p><strong>Avoid deep nesting</strong>: Keep hierarchies manageable</p></li>
+<li><p><strong>Log transitions</strong>: Aids debugging</p></li>
+<li><p><strong>Make it deterministic</strong>: Same input = same output</p></li>
+</ol>
+</section>
+<section id="debugging-state-machines">
+<h2>Debugging State Machines<a class="headerlink" href="#debugging-state-machines" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// State machine debugging helper</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">state_names</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_IDLE</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;IDLE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_RUNNING</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;RUNNING&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_PAUSED</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PAUSED&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">STATE_ERROR</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ERROR&quot;</span>
+<span class="p">};</span>
+
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">event_names</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">EVENT_START</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;START&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">EVENT_STOP</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;STOP&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">EVENT_PAUSE</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;PAUSE&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">EVENT_RESUME</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;RESUME&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">EVENT_ERROR</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ERROR&quot;</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">log_transition</span><span class="p">(</span><span class="n">system_state_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span><span class="w"> </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="w"> </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;[%u] %s + %s -&gt; %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">xTaskGetTickCount</span><span class="p">(),</span>
+<span class="w">           </span><span class="n">state_names</span><span class="p">[</span><span class="n">from</span><span class="p">],</span>
+<span class="w">           </span><span class="n">event_names</span><span class="p">[</span><span class="n">event</span><span class="p">],</span>
+<span class="w">           </span><span class="n">state_names</span><span class="p">[</span><span class="n">to</span><span class="p">]);</span>
+<span class="p">}</span>
+
+<span class="c1">// History buffer for debugging</span>
+<span class="cp">#define HISTORY_SIZE 32</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">from_state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">to_state</span><span class="p">;</span>
+<span class="w">    </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">transition_history_t</span><span class="p">;</span>
+
+<span class="n">transition_history_t</span><span class="w"> </span><span class="n">history</span><span class="p">[</span><span class="n">HISTORY_SIZE</span><span class="p">];</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">history_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">record_transition</span><span class="p">(</span><span class="n">system_state_t</span><span class="w"> </span><span class="n">from</span><span class="p">,</span><span class="w"> </span><span class="n">system_state_t</span><span class="w"> </span><span class="n">to</span><span class="p">,</span><span class="w"> </span><span class="n">system_event_t</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">history</span><span class="p">[</span><span class="n">history_idx</span><span class="p">].</span><span class="n">from_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">from</span><span class="p">;</span>
+<span class="w">    </span><span class="n">history</span><span class="p">[</span><span class="n">history_idx</span><span class="p">].</span><span class="n">to_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">to</span><span class="p">;</span>
+<span class="w">    </span><span class="n">history</span><span class="p">[</span><span class="n">history_idx</span><span class="p">].</span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+<span class="w">    </span><span class="n">history</span><span class="p">[</span><span class="n">history_idx</span><span class="p">].</span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="n">history_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">history_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">HISTORY_SIZE</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day02.html"><span class="doc">Day 02 - Tasks and Threads</span></a> - Tasks and Threads</p></li>
+<li><p><a class="reference internal" href="../overview/synchronization.html"><span class="doc">Synchronization</span></a> - Event queues</p></li>
+<li><p><a class="reference internal" href="command_dispatcher.html"><span class="doc">Command Dispatcher</span></a> - Command processing patterns</p></li>
+<li><p><a class="reference internal" href="periodic_scheduler.html"><span class="doc">Periodic Scheduler</span></a> - Periodic state machine execution</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“UML State Machines” by Miro Samek</p></li>
+<li><p>“Practical Statecharts in C/C++” by Miro Samek</p></li>
+<li><p>Design Patterns (Gang of Four)</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/patterns/state_machine_tasks.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

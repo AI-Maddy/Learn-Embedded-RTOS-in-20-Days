@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>PikeOS (PX5/P4) Cheat Sheet &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="pikeos-px5-p4-cheat-sheet">
+<h1>PikeOS (PX5/P4) Cheat Sheet<a class="headerlink" href="#pikeos-px5-p4-cheat-sheet" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<p>PikeOS is a commercial separation kernel/hypervisor providing time and space partitioning for safety-critical systems.</p>
+<section id="architecture-overview">
+<h3>Architecture Overview<a class="headerlink" href="#architecture-overview" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>PikeOS Microkernel
+├── Partitions (isolated address spaces)
+│   ├── POSIX Partitions (PSE51/PSE52/PSE53)
+│   ├── Native PikeOS API
+│   ├── Linux Personality
+│   └── AUTOSAR Personality
+└── Resource Management (CPU time, memory, I/O)
+</pre></div>
+</div>
+</section>
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h3>
+<p><strong>Project XML</strong> defines partitions and resource allocation:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;project&gt;</span>
+<span class="w">  </span><span class="nt">&lt;partition</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;Part1&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;memory&gt;</span>4MB<span class="nt">&lt;/memory&gt;</span>
+<span class="w">    </span><span class="nt">&lt;priority&gt;</span>10<span class="nt">&lt;/priority&gt;</span>
+<span class="w">    </span><span class="nt">&lt;schedule&gt;</span>
+<span class="w">      </span><span class="nt">&lt;window</span><span class="w"> </span><span class="na">start=</span><span class="s">&quot;0ms&quot;</span><span class="w"> </span><span class="na">duration=</span><span class="s">&quot;10ms&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/schedule&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/partition&gt;</span>
+<span class="nt">&lt;/project&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="native-api-p4-vm-api">
+<h2>Native API (P4/VM API)<a class="headerlink" href="#native-api-p4-vm-api" title="Link to this heading">¶</a></h2>
+<section id="thread-api">
+<h3>Thread API<a class="headerlink" href="#thread-api" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vm.h&gt;</span>
+
+<span class="c1">// Thread structure</span>
+<span class="n">vm_thread_t</span><span class="w"> </span><span class="kr">thread</span><span class="p">;</span>
+
+<span class="c1">// Thread function</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">thread_func</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Thread body</span>
+<span class="w">        </span><span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Create thread</span>
+<span class="n">vm_error_t</span><span class="w"> </span><span class="nf">vm_cre_tsk</span><span class="p">(</span>
+<span class="w">    </span><span class="n">vm_thread_t</span><span class="w"> </span><span class="o">*</span><span class="kr">thread</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">vm_cre_tsk_t</span><span class="w"> </span><span class="o">*</span><span class="n">pk_ctsk</span>
+<span class="p">);</span>
+
+<span class="c1">// Thread attributes</span>
+<span class="n">vm_cre_tsk_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">exinf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">tskatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_HLNG</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_ACT</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">thread_func</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">itskpri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">stksz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4096</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">stk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w">  </span><span class="c1">// Auto-allocate</span>
+
+<span class="n">vm_cre_tsk</span><span class="p">(</span><span class="o">&amp;</span><span class="kr">thread</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Start thread (if not auto-started)</span>
+<span class="n">vm_sta_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+
+<span class="c1">// Terminate thread</span>
+<span class="n">vm_ter_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">);</span>
+<span class="n">vm_ext_tsk</span><span class="p">();</span><span class="w">  </span><span class="c1">// Exit self</span>
+</pre></div>
+</div>
+</section>
+<section id="delay-sleep">
+<h3>Delay/Sleep<a class="headerlink" href="#delay-sleep" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Delay (microseconds)</span>
+<span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_US</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_S</span><span class="p">(</span><span class="mi">1</span><span class="p">));</span>
+
+<span class="c1">// Delay until absolute time</span>
+<span class="n">vm_dly_tsk</span><span class="p">(</span><span class="n">ticks</span><span class="p">);</span>
+
+<span class="c1">// Sleep until woken</span>
+<span class="n">vm_slp_tsk</span><span class="p">(</span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Wake thread</span>
+<span class="n">vm_wup_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-control">
+<h3>Priority/Control<a class="headerlink" href="#priority-control" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Change priority</span>
+<span class="n">vm_chg_pri</span><span class="p">(</span><span class="kr">thread</span><span class="p">,</span><span class="w"> </span><span class="n">new_priority</span><span class="p">);</span>
+
+<span class="c1">// Get priority</span>
+<span class="n">vm_ref_tsk_t</span><span class="w"> </span><span class="n">status</span><span class="p">;</span>
+<span class="n">vm_ref_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">status</span><span class="p">);</span>
+
+<span class="c1">// Suspend/Resume</span>
+<span class="n">vm_sus_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">);</span>
+<span class="n">vm_rsm_tsk</span><span class="p">(</span><span class="kr">thread</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="semaphore-api">
+<h2>Semaphore API<a class="headerlink" href="#semaphore-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_sem_t</span><span class="w"> </span><span class="n">sem</span><span class="p">;</span>
+
+<span class="c1">// Create semaphore</span>
+<span class="n">vm_cre_sem_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">sematr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="p">;</span><span class="w">  </span><span class="c1">// FIFO or TPRI (priority)</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">isemcnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">maxsem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+
+<span class="n">vm_cre_sem</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Wait (decrement)</span>
+<span class="n">vm_wai_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">);</span>
+<span class="n">vm_twai_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">vm_pol_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+
+<span class="c1">// Signal (increment)</span>
+<span class="n">vm_sig_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mutex-api">
+<h2>Mutex API<a class="headerlink" href="#mutex-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_mtx_t</span><span class="w"> </span><span class="n">mutex</span><span class="p">;</span>
+
+<span class="c1">// Create mutex</span>
+<span class="n">vm_cre_mtx_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mtxatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_INHERIT</span><span class="p">;</span><span class="w">  </span><span class="c1">// Priority inheritance</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">ceilpri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Priority ceiling protocol</span>
+
+<span class="n">vm_cre_mtx</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mutex</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Lock</span>
+<span class="n">vm_loc_mtx</span><span class="p">(</span><span class="n">mutex</span><span class="p">);</span>
+<span class="n">vm_tloc_mtx</span><span class="p">(</span><span class="n">mutex</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Unlock</span>
+<span class="n">vm_unl_mtx</span><span class="p">(</span><span class="n">mutex</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_mtx</span><span class="p">(</span><span class="n">mutex</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="event-flag-api">
+<h2>Event Flag API<a class="headerlink" href="#event-flag-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_flg_t</span><span class="w"> </span><span class="n">flag</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_flg_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">flgatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_WMUL</span><span class="p">;</span><span class="w">  </span><span class="c1">// Multiple waiters</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">iflgptn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="n">vm_cre_flg</span><span class="p">(</span><span class="o">&amp;</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Set flags</span>
+<span class="n">vm_set_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">);</span>
+
+<span class="c1">// Clear flags</span>
+<span class="n">vm_clr_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="o">~</span><span class="n">pattern</span><span class="p">);</span>
+
+<span class="c1">// Wait for flags</span>
+<span class="n">vm_flgptn_t</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="n">vm_wai_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">VM_TWF_ANDW</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">);</span><span class="w">  </span><span class="c1">// AND wait</span>
+<span class="n">vm_wai_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">VM_TWF_ORW</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">);</span><span class="w">   </span><span class="c1">// OR wait</span>
+
+<span class="c1">// Timed wait</span>
+<span class="n">vm_twai_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">VM_TWF_ORW</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="message-queue-api">
+<h2>Message Queue API<a class="headerlink" href="#message-queue-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_dtq_t</span><span class="w"> </span><span class="n">queue</span><span class="p">;</span>
+
+<span class="c1">// Create data queue</span>
+<span class="n">vm_cre_dtq_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">dtqatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">dtqcnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w">  </span><span class="c1">// Max messages</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">dtq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w">   </span><span class="c1">// Auto-allocate</span>
+
+<span class="n">vm_cre_dtq</span><span class="p">(</span><span class="o">&amp;</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Send</span>
+<span class="n">vm_intptr_t</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span>
+<span class="n">vm_snd_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">);</span>
+<span class="n">vm_tsnd_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">vm_psnd_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+
+<span class="c1">// Receive</span>
+<span class="n">vm_intptr_t</span><span class="w"> </span><span class="n">received</span><span class="p">;</span>
+<span class="n">vm_rcv_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received</span><span class="p">);</span>
+<span class="n">vm_trcv_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">vm_prcv_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mailbox-api">
+<h2>Mailbox API<a class="headerlink" href="#mailbox-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_mbx_t</span><span class="w"> </span><span class="n">mailbox</span><span class="p">;</span>
+
+<span class="c1">// Message structure (must start with T_MSG)</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">T_MSG</span><span class="w"> </span><span class="n">msgque</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">MY_MSG</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_mbx_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mbxatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_MFIFO</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">maxmpri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mprihd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="n">vm_cre_mbx</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mailbox</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Send</span>
+<span class="n">MY_MSG</span><span class="w"> </span><span class="o">*</span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">malloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="n">MY_MSG</span><span class="p">));</span>
+<span class="n">msg</span><span class="o">-&gt;</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span>
+<span class="n">vm_snd_mbx</span><span class="p">(</span><span class="n">mailbox</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">T_MSG</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">msg</span><span class="p">);</span>
+
+<span class="c1">// Receive</span>
+<span class="n">T_MSG</span><span class="w"> </span><span class="o">*</span><span class="n">recv_msg</span><span class="p">;</span>
+<span class="n">vm_rcv_mbx</span><span class="p">(</span><span class="n">mailbox</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">recv_msg</span><span class="p">);</span>
+<span class="n">MY_MSG</span><span class="w"> </span><span class="o">*</span><span class="n">my_msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">MY_MSG</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">recv_msg</span><span class="p">;</span>
+
+<span class="c1">// Process and free</span>
+<span class="n">free</span><span class="p">(</span><span class="n">my_msg</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_mbx</span><span class="p">(</span><span class="n">mailbox</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-pool-api">
+<h2>Memory Pool API<a class="headerlink" href="#memory-pool-api" title="Link to this heading">¶</a></h2>
+<section id="fixed-size-blocks">
+<h3>Fixed-size Blocks<a class="headerlink" href="#fixed-size-blocks" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_mpf_t</span><span class="w"> </span><span class="n">pool</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_mpf_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mpfatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">blkcnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">blksz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mpf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w">  </span><span class="c1">// Auto-allocate</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mpfmb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="n">vm_cre_mpf</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Allocate block</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">block</span><span class="p">;</span>
+<span class="n">vm_get_mpf</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">block</span><span class="p">);</span>
+<span class="n">vm_tget_mpf</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">block</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">vm_pget_mpf</span><span class="p">(</span><span class="o">&amp;</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">block</span><span class="p">);</span><span class="w">  </span><span class="c1">// Non-blocking</span>
+
+<span class="c1">// Release block</span>
+<span class="n">vm_rel_mpf</span><span class="p">(</span><span class="n">pool</span><span class="p">,</span><span class="w"> </span><span class="n">block</span><span class="p">);</span>
+
+<span class="c1">// Delete pool</span>
+<span class="n">vm_del_mpf</span><span class="p">(</span><span class="n">pool</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="variable-size-allocator">
+<h3>Variable-size Allocator<a class="headerlink" href="#variable-size-allocator" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_mpl_t</span><span class="w"> </span><span class="n">vpool</span><span class="p">;</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_mpl_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mplatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mplsz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4096</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mpl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">mplmb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="n">vm_cre_mpl</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vpool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Allocate</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">mem</span><span class="p">;</span>
+<span class="n">vm_get_mpl</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vpool</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">mem</span><span class="p">);</span>
+<span class="n">vm_tget_mpl</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vpool</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">mem</span><span class="p">,</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Release</span>
+<span class="n">vm_rel_mpl</span><span class="p">(</span><span class="n">vpool</span><span class="p">,</span><span class="w"> </span><span class="n">mem</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_mpl</span><span class="p">(</span><span class="n">vpool</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="cyclic-handler-periodic-timer">
+<h2>Cyclic Handler (Periodic Timer)<a class="headerlink" href="#cyclic-handler-periodic-timer" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_cyc_t</span><span class="w"> </span><span class="n">cyclic</span><span class="p">;</span>
+
+<span class="c1">// Handler function</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">cyclic_handler</span><span class="p">(</span><span class="n">vm_exinf_t</span><span class="w"> </span><span class="n">exinf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Called periodically from ISR context</span>
+<span class="p">}</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_cyc_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">cycatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_HLNG</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_STA</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">exinf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">cychdr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cyclic_handler</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">cyctim</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span><span class="w">  </span><span class="c1">// Period</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">cycphs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// Phase offset</span>
+
+<span class="n">vm_cre_cyc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cyclic</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Start</span>
+<span class="n">vm_sta_cyc</span><span class="p">(</span><span class="n">cyclic</span><span class="p">);</span>
+
+<span class="c1">// Stop</span>
+<span class="n">vm_stp_cyc</span><span class="p">(</span><span class="n">cyclic</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_cyc</span><span class="p">(</span><span class="n">cyclic</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="alarm-handler">
+<h2>Alarm Handler<a class="headerlink" href="#alarm-handler" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">vm_alm_t</span><span class="w"> </span><span class="n">alarm</span><span class="p">;</span>
+
+<span class="c1">// Handler</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">alarm_handler</span><span class="p">(</span><span class="n">vm_exinf_t</span><span class="w"> </span><span class="n">exinf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// One-shot callback</span>
+<span class="p">}</span>
+
+<span class="c1">// Create</span>
+<span class="n">vm_cre_alm_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">almatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_HLNG</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">exinf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">almhdr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">alarm_handler</span><span class="p">;</span>
+
+<span class="n">vm_cre_alm</span><span class="p">(</span><span class="o">&amp;</span><span class="n">alarm</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+
+<span class="c1">// Start (one-shot)</span>
+<span class="n">vm_sta_alm</span><span class="p">(</span><span class="n">alarm</span><span class="p">,</span><span class="w"> </span><span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+
+<span class="c1">// Stop</span>
+<span class="n">vm_stp_alm</span><span class="p">(</span><span class="n">alarm</span><span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="n">vm_del_alm</span><span class="p">(</span><span class="n">alarm</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="interrupt-handling">
+<h2>Interrupt Handling<a class="headerlink" href="#interrupt-handling" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define interrupt handler</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">my_isr</span><span class="p">(</span><span class="n">vm_exinf_t</span><span class="w"> </span><span class="n">exinf</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// ISR code</span>
+
+<span class="w">    </span><span class="c1">// Can call limited APIs from ISR</span>
+<span class="w">    </span><span class="n">vm_sig_sem</span><span class="p">(</span><span class="n">sem</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vm_set_flg</span><span class="p">(</span><span class="n">flag</span><span class="p">,</span><span class="w"> </span><span class="mh">0x01</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vm_snd_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">// Register ISR</span>
+<span class="n">vm_def_inh_t</span><span class="w"> </span><span class="n">attr</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">inhatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_HLNG</span><span class="p">;</span>
+<span class="n">attr</span><span class="p">.</span><span class="n">inthdr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">my_isr</span><span class="p">;</span>
+
+<span class="n">vm_def_inh</span><span class="p">(</span><span class="n">IRQ_NUMBER</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="time-services">
+<h2>Time Services<a class="headerlink" href="#time-services" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get system time (microseconds)</span>
+<span class="n">vm_time_t</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vm_get_tim</span><span class="p">();</span>
+
+<span class="c1">// Convert time</span>
+<span class="n">VM_TIME_US</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">     </span><span class="c1">// 100 microseconds</span>
+<span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w">     </span><span class="c1">// 100 milliseconds</span>
+<span class="n">VM_TIME_S</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w">        </span><span class="c1">// 1 second</span>
+
+<span class="c1">// Timeouts</span>
+<span class="n">VM_TMO_POL</span><span class="w">          </span><span class="c1">// 0 - No wait</span>
+<span class="n">VM_TMO_FEVR</span><span class="w">         </span><span class="c1">// -1 - Wait forever</span>
+</pre></div>
+</div>
+</section>
+<section id="posix-personality">
+<h2>POSIX Personality<a class="headerlink" href="#posix-personality" title="Link to this heading">¶</a></h2>
+<p>PikeOS supports POSIX PSE51-53 profiles:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;pthread.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;semaphore.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;mqueue.h&gt;</span>
+
+<span class="c1">// Standard POSIX APIs work</span>
+<span class="n">pthread_t</span><span class="w"> </span><span class="kr">thread</span><span class="p">;</span>
+<span class="n">pthread_create</span><span class="p">(</span><span class="o">&amp;</span><span class="kr">thread</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">thread_func</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="n">sem_t</span><span class="w"> </span><span class="n">sem</span><span class="p">;</span>
+<span class="n">sem_init</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="n">sem_wait</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span>
+<span class="n">sem_post</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span>
+
+<span class="n">mqd_t</span><span class="w"> </span><span class="n">mq</span><span class="p">;</span>
+<span class="n">mq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mq_open</span><span class="p">(</span><span class="s">&quot;/myqueue&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">O_CREAT</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">O_RDWR</span><span class="p">,</span><span class="w"> </span><span class="mo">0644</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="partition-communication">
+<h2>Partition Communication<a class="headerlink" href="#partition-communication" title="Link to this heading">¶</a></h2>
+<section id="queuing-ports-inter-partition">
+<h3>Queuing Ports (Inter-Partition)<a class="headerlink" href="#queuing-ports-inter-partition" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;p4.h&gt;</span>
+
+<span class="c1">// Open port</span>
+<span class="n">p4_qport_t</span><span class="w"> </span><span class="n">port</span><span class="p">;</span>
+<span class="n">p4_e_t</span><span class="w"> </span><span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p4_qport_open</span><span class="p">(</span><span class="o">&amp;</span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;PortName&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">P4_QPORT_SEND</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="c1">// Send message</span>
+<span class="kt">char</span><span class="w"> </span><span class="n">msg</span><span class="p">[</span><span class="mi">64</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;Hello&quot;</span><span class="p">;</span>
+<span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p4_qport_send</span><span class="p">(</span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">msg</span><span class="p">),</span><span class="w"> </span><span class="n">P4_TIMEOUT_INFINITE</span><span class="p">);</span>
+
+<span class="c1">// Receive message</span>
+<span class="kt">char</span><span class="w"> </span><span class="n">buffer</span><span class="p">[</span><span class="mi">64</span><span class="p">];</span>
+<span class="n">p4_size_t</span><span class="w"> </span><span class="n">size</span><span class="p">;</span>
+<span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p4_qport_receive</span><span class="p">(</span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="n">buffer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="n">P4_TIMEOUT_INFINITE</span><span class="p">);</span>
+
+<span class="c1">// Close port</span>
+<span class="n">p4_qport_close</span><span class="p">(</span><span class="n">port</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="sampling-ports-periodic-data">
+<h3>Sampling Ports (Periodic Data)<a class="headerlink" href="#sampling-ports-periodic-data" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Open sampling port</span>
+<span class="n">p4_sport_t</span><span class="w"> </span><span class="n">sport</span><span class="p">;</span>
+<span class="n">p4_sport_open</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sport</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;SamplingPort&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">P4_SPORT_WRITE</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="c1">// Write sample</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span>
+<span class="n">p4_sport_write</span><span class="p">(</span><span class="n">sport</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">data</span><span class="p">));</span>
+
+<span class="c1">// Read sample</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">received</span><span class="p">;</span>
+<span class="n">p4_bool_t</span><span class="w"> </span><span class="n">valid</span><span class="p">;</span>
+<span class="n">p4_sport_read</span><span class="p">(</span><span class="n">sport</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">received</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">valid</span><span class="p">);</span>
+
+<span class="c1">// Close</span>
+<span class="n">p4_sport_close</span><span class="p">(</span><span class="n">sport</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="system-services">
+<h2>System Services<a class="headerlink" href="#system-services" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get CPU time</span>
+<span class="n">vm_time_t</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vm_get_tim</span><span class="p">();</span>
+
+<span class="c1">// Partition mode switch</span>
+<span class="n">vm_set_ctx</span><span class="p">(</span><span class="n">ctx_id</span><span class="p">);</span>
+
+<span class="c1">// Virtual interrupt</span>
+<span class="n">vm_sig_int</span><span class="p">(</span><span class="n">int_number</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="return-values">
+<h2>Return Values<a class="headerlink" href="#return-values" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">VM_E_OK</span><span class="w">             </span><span class="c1">// Success</span>
+<span class="n">VM_E_SYS</span><span class="w">            </span><span class="c1">// System error</span>
+<span class="n">VM_E_NOMEM</span><span class="w">          </span><span class="c1">// No memory</span>
+<span class="n">VM_E_NOSPT</span><span class="w">          </span><span class="c1">// Not supported</span>
+<span class="n">VM_E_INOSPT</span><span class="w">         </span><span class="c1">// Invalid operation</span>
+<span class="n">VM_E_RSFN</span><span class="w">           </span><span class="c1">// Reserved function</span>
+<span class="n">VM_E_RSATR</span><span class="w">          </span><span class="c1">// Reserved attribute</span>
+<span class="n">VM_E_PAR</span><span class="w">            </span><span class="c1">// Parameter error</span>
+<span class="n">VM_E_ID</span><span class="w">             </span><span class="c1">// Invalid ID</span>
+<span class="n">VM_E_CTX</span><span class="w">            </span><span class="c1">// Context error</span>
+<span class="n">VM_E_MACV</span><span class="w">           </span><span class="c1">// Memory access violation</span>
+<span class="n">VM_E_OACV</span><span class="w">           </span><span class="c1">// Object access violation</span>
+<span class="n">VM_E_ILUSE</span><span class="w">          </span><span class="c1">// Illegal service call</span>
+<span class="n">VM_E_NOMEM</span><span class="w">          </span><span class="c1">// Insufficient memory</span>
+<span class="n">VM_E_NOID</span><span class="w">           </span><span class="c1">// No ID available</span>
+<span class="n">VM_E_OBJ</span><span class="w">            </span><span class="c1">// Object error</span>
+<span class="n">VM_E_NOEXS</span><span class="w">          </span><span class="c1">// Object does not exist</span>
+<span class="n">VM_E_QOVR</span><span class="w">           </span><span class="c1">// Queue overflow</span>
+<span class="n">VM_E_RLWAI</span><span class="w">          </span><span class="c1">// Wait released</span>
+<span class="n">VM_E_TMOUT</span><span class="w">          </span><span class="c1">// Timeout</span>
+<span class="n">VM_E_DLT</span><span class="w">            </span><span class="c1">// Object deleted</span>
+<span class="n">VM_E_CLS</span><span class="w">            </span><span class="c1">// Waiting cancelled</span>
+</pre></div>
+</div>
+</section>
+<section id="example-application">
+<h2>Example Application<a class="headerlink" href="#example-application" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vm.h&gt;</span>
+
+<span class="n">vm_thread_t</span><span class="w"> </span><span class="n">producer</span><span class="p">,</span><span class="w"> </span><span class="n">consumer</span><span class="p">;</span>
+<span class="n">vm_dtq_t</span><span class="w"> </span><span class="n">queue</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">producer_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vm_intptr_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vm_snd_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">);</span>
+<span class="w">        </span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_MS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">consumer_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vm_intptr_t</span><span class="w"> </span><span class="n">data</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vm_rcv_dtq</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">data</span><span class="p">);</span>
+<span class="w">        </span><span class="c1">// Process data</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Create queue</span>
+<span class="w">    </span><span class="n">vm_cre_dtq_t</span><span class="w"> </span><span class="n">qattr</span><span class="p">;</span>
+<span class="w">    </span><span class="n">qattr</span><span class="p">.</span><span class="n">dtqatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_TFIFO</span><span class="p">;</span>
+<span class="w">    </span><span class="n">qattr</span><span class="p">.</span><span class="n">dtqcnt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">    </span><span class="n">qattr</span><span class="p">.</span><span class="n">dtq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vm_cre_dtq</span><span class="p">(</span><span class="o">&amp;</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">qattr</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Create threads</span>
+<span class="w">    </span><span class="n">vm_cre_tsk_t</span><span class="w"> </span><span class="n">tattr</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">exinf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">tskatr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VM_TA_HLNG</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">VM_TA_ACT</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">itskpri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">stksz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4096</span><span class="p">;</span>
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">stk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">producer_task</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vm_cre_tsk</span><span class="p">(</span><span class="o">&amp;</span><span class="n">producer</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tattr</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">tattr</span><span class="p">.</span><span class="n">task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">consumer_task</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vm_cre_tsk</span><span class="p">(</span><span class="o">&amp;</span><span class="n">consumer</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tattr</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Main loop</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">vm_delay</span><span class="p">(</span><span class="n">VM_TIME_S</span><span class="p">(</span><span class="mi">1</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>✗ Not configuring partition XML correctly
+✗ Exceeding partition memory/CPU time budget
+✗ Using wrong API from ISR context
+✗ Not checking return values
+✗ Time window configuration errors
+✗ Incorrect inter-partition communication setup
+✗ Mixing native and POSIX APIs incorrectly
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Generic RTOS concepts</p></li>
+<li><p><a class="reference internal" href="../days/day17.html"><span class="doc">Day 17 - PX5</span></a> - PikeOS/PX5 deep dive</p></li>
+<li><p>Official PikeOS documentation: sysgo.com</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cheatsheets/px5_cheatsheet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

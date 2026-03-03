@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>RTOS Basics &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="rtos-basics">
+<h1>RTOS Basics<a class="headerlink" href="#rtos-basics" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p>A <strong>Real-Time Operating System (RTOS)</strong> is an operating system designed to serve real-time applications that process data with strict timing constraints. Unlike general-purpose operating systems, an RTOS guarantees deterministic behavior and predictable response times.</p>
+</section>
+<section id="core-concepts">
+<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Link to this heading">¶</a></h2>
+<section id="tasks-and-threads">
+<h3>Tasks and Threads<a class="headerlink" href="#tasks-and-threads" title="Link to this heading">¶</a></h3>
+<p>Tasks (or threads) are the fundamental units of execution in an RTOS. Each task represents an independent flow of control with its own:</p>
+<ul class="simple">
+<li><p><strong>Stack</strong>: Local variables and function call context</p></li>
+<li><p><strong>Priority</strong>: Determines scheduling order</p></li>
+<li><p><strong>State</strong>: Running, Ready, Blocked, or Suspended</p></li>
+</ul>
+<p><strong>Task States:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌─────────┐  Preempted   ┌───────┐
+│ RUNNING ├─────────────►│ READY │
+└────┬────┘              └───┬───┘
+     │                       │
+     │ Block on            │ Schedule
+     │ Resource             │
+     │                       │
+     ▼                       ▼
+┌─────────┐              ┌───────┐
+│ BLOCKED │              │ READY │
+└─────────┘              └───────┘
+</pre></div>
+</div>
+<p>Task Example:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">sensor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Read sensor data</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_sensor</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Process data</span>
+<span class="w">        </span><span class="n">process_sensor_data</span><span class="p">(</span><span class="n">data</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Delay until next period</span>
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="the-scheduler">
+<h3>The Scheduler<a class="headerlink" href="#the-scheduler" title="Link to this heading">¶</a></h3>
+<p>The <strong>scheduler</strong> is the core component that decides which task runs at any given time. It ensures:</p>
+<ul class="simple">
+<li><p><strong>Highest priority ready task always runs</strong> (priority-based scheduling)</p></li>
+<li><p><strong>Deterministic task switching</strong> with predictable latency</p></li>
+<li><p><strong>Minimal overhead</strong> for context switching</p></li>
+</ul>
+<p>Scheduling Policies:</p>
+<ol class="arabic simple">
+<li><p><strong>Preemptive Priority-Based</strong>: Higher priority tasks preempt lower priority ones</p></li>
+<li><p><strong>Cooperative</strong>: Tasks voluntarily yield control</p></li>
+<li><p><strong>Time-Slicing</strong>: Equal priority tasks share CPU time</p></li>
+</ol>
+</section>
+<section id="determinism">
+<h3>Determinism<a class="headerlink" href="#determinism" title="Link to this heading">¶</a></h3>
+<p><strong>Determinism</strong> means the system’s behavior is predictable and repeatable. In an RTOS:</p>
+<ul class="simple">
+<li><p>Task scheduling latency has a <strong>known upper bound</strong></p></li>
+<li><p>Interrupt response time is <strong>guaranteed</strong></p></li>
+<li><p>System calls complete within <strong>predictable timeframes</strong></p></li>
+</ul>
+<p>Factors affecting determinism:</p>
+<ul class="simple">
+<li><p>Interrupt masking duration</p></li>
+<li><p>Critical section length</p></li>
+<li><p>Scheduling algorithm complexity</p></li>
+<li><p>Memory access patterns</p></li>
+</ul>
+</section>
+<section id="real-time-constraints">
+<h3>Real-Time Constraints<a class="headerlink" href="#real-time-constraints" title="Link to this heading">¶</a></h3>
+<p>Real-time systems classify timing requirements into:</p>
+<section id="hard-real-time">
+<h4>Hard Real-Time<a class="headerlink" href="#hard-real-time" title="Link to this heading">¶</a></h4>
+<p>Missing a deadline causes <strong>system failure</strong>. Examples:</p>
+<ul class="simple">
+<li><p>Airbag deployment (must trigger within 10ms)</p></li>
+<li><p>Anti-lock braking control</p></li>
+<li><p>Pacemaker timing</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Hard real-time constraint example</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">airbag_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">MAX_RESPONSE_TIME_MS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">detect_collision</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// MUST complete within 10ms</span>
+<span class="w">            </span><span class="n">deploy_airbag</span><span class="p">();</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="soft-real-time">
+<h4>Soft Real-Time<a class="headerlink" href="#soft-real-time" title="Link to this heading">¶</a></h4>
+<p>Missing deadlines <strong>degrades performance</strong> but doesn’t cause failure:</p>
+<ul class="simple">
+<li><p>Audio/video streaming</p></li>
+<li><p>User interface updates</p></li>
+<li><p>Network packet processing</p></li>
+</ul>
+</section>
+<section id="firm-real-time">
+<h4>Firm Real-Time<a class="headerlink" href="#firm-real-time" title="Link to this heading">¶</a></h4>
+<p>Missing occasional deadlines is acceptable, but repeated misses cause failure:</p>
+<ul class="simple">
+<li><p>Manufacturing control systems</p></li>
+<li><p>Telecommunications</p></li>
+</ul>
+</section>
+</section>
+<section id="priority-inversion">
+<h3>Priority Inversion<a class="headerlink" href="#priority-inversion" title="Link to this heading">¶</a></h3>
+<p><strong>Priority inversion</strong> occurs when a high-priority task waits for a resource held by a low-priority task, while a medium-priority task runs.</p>
+<p><strong>Solution</strong>: Priority inheritance - the low-priority task temporarily inherits the high-priority task’s priority.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Without priority inheritance</span>
+<span class="n">mutex_lock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">shared_resource</span><span class="p">);</span><span class="w">    </span><span class="c1">// Low priority holds mutex</span>
+<span class="c1">// High priority blocked, medium priority runs!</span>
+
+<span class="c1">// With priority inheritance</span>
+<span class="n">mutex_lock_inherit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">shared_resource</span><span class="p">);</span><span class="w">  </span><span class="c1">// Low priority inherits high priority</span>
+<span class="c1">// Medium priority cannot preempt</span>
+</pre></div>
+</div>
+</section>
+<section id="context-switching">
+<h3>Context Switching<a class="headerlink" href="#context-switching" title="Link to this heading">¶</a></h3>
+<p><strong>Context switching</strong> is the process of saving one task’s state and restoring another’s. An RTOS minimizes context switch time through:</p>
+<ul class="simple">
+<li><p>Efficient save/restore of CPU registers</p></li>
+<li><p>Optimized stack management</p></li>
+<li><p>Hardware-assisted switching (on some architectures)</p></li>
+</ul>
+<p>Typical context switch times: <strong>1-10 microseconds</strong></p>
+</section>
+<section id="stack-management">
+<h3>Stack Management<a class="headerlink" href="#stack-management" title="Link to this heading">¶</a></h3>
+<p>Each task requires its own stack. Key considerations:</p>
+<ul class="simple">
+<li><p><strong>Stack size</strong>: Must accommodate worst-case usage</p></li>
+<li><p><strong>Stack overflow detection</strong>: Debug guards or MPU protection</p></li>
+<li><p><strong>Stack allocation</strong>: Static vs dynamic</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Static stack allocation</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">sensor_task_stack</span><span class="p">[</span><span class="mi">2048</span><span class="p">];</span>
+
+<span class="c1">// Create task with specific stack</span>
+<span class="n">xTaskCreateStatic</span><span class="p">(</span><span class="n">sensor_task</span><span class="p">,</span>
+<span class="w">                  </span><span class="s">&quot;Sensor&quot;</span><span class="p">,</span>
+<span class="w">                  </span><span class="mi">2048</span><span class="p">,</span>
+<span class="w">                  </span><span class="nb">NULL</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">PRIORITY_NORMAL</span><span class="p">,</span>
+<span class="w">                  </span><span class="n">sensor_task_stack</span><span class="p">,</span>
+<span class="w">                  </span><span class="o">&amp;</span><span class="n">sensor_task_tcb</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="tick-timer">
+<h3>Tick Timer<a class="headerlink" href="#tick-timer" title="Link to this heading">¶</a></h3>
+<p>The RTOS <strong>tick timer</strong> provides the time base for:</p>
+<ul class="simple">
+<li><p>Task delays</p></li>
+<li><p>Timeouts</p></li>
+<li><p>Time-slicing</p></li>
+<li><p>Time tracking</p></li>
+</ul>
+<p>Common tick rates: <strong>100Hz to 1000Hz</strong> (1-10ms periods)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure tick rate (FreeRTOS example)</span>
+<span class="cp">#define configTICK_RATE_HZ  1000  </span><span class="c1">// 1ms tick</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="kernel-objects">
+<h2>Kernel Objects<a class="headerlink" href="#kernel-objects" title="Link to this heading">¶</a></h2>
+<section id="critical-section">
+<h3>Critical Section<a class="headerlink" href="#critical-section" title="Link to this heading">¶</a></h3>
+<p>A code region that must execute atomically:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Disable interrupts briefly</span>
+<span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="n">shared_counter</span><span class="o">++</span><span class="p">;</span>
+<span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="idle-task">
+<h3>Idle Task<a class="headerlink" href="#idle-task" title="Link to this heading">¶</a></h3>
+<p>The <strong>idle task</strong> runs when no other task is ready. Uses:</p>
+<ul class="simple">
+<li><p>Put CPU in low-power mode</p></li>
+<li><p>Background garbage collection</p></li>
+<li><p>Monitor system health</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">vApplicationIdleHook</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Enter low-power mode</span>
+<span class="w">    </span><span class="n">__WFI</span><span class="p">();</span><span class="w">  </span><span class="c1">// Wait For Interrupt</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Keep ISRs short</strong>: Defer processing to tasks</p></li>
+<li><p><strong>Avoid blocking in ISRs</strong>: Never call blocking functions</p></li>
+<li><p><strong>Size stacks carefully</strong>: Use stack analysis tools</p></li>
+<li><p><strong>Minimize critical sections</strong>: Keep interrupt-disabled time minimal</p></li>
+<li><p><strong>Use appropriate priorities</strong>: Assign based on deadline urgency</p></li>
+<li><p><strong>Design for worst-case</strong>: Plan for maximum load scenarios</p></li>
+<li><p><strong>Test timing</strong>: Measure actual response times under load</p></li>
+</ol>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Stack overflow</strong>: Insufficient stack allocation</p></li>
+<li><p><strong>Priority inversion</strong>: Not using priority inheritance</p></li>
+<li><p><strong>Starvation</strong>: Low-priority tasks never run</p></li>
+<li><p><strong>Deadlock</strong>: Circular resource dependencies</p></li>
+<li><p><strong>Race conditions</strong>: Unsynchronized shared data access</p></li>
+</ul>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day01.html"><span class="doc">Day 01 - Intro to RTOS</span></a> - Introduction to RTOS</p></li>
+<li><p><a class="reference internal" href="../days/day02.html"><span class="doc">Day 02 - Tasks and Threads</span></a> - Tasks and Threads</p></li>
+<li><p><a class="reference internal" href="../days/day03.html"><span class="doc">Day 03 - Scheduling and Determinism</span></a> - Scheduling and Determinism</p></li>
+<li><p><a class="reference internal" href="scheduling.html"><span class="doc">Scheduling Algorithms</span></a> - Detailed scheduling algorithms</p></li>
+<li><p><a class="reference internal" href="synchronization.html"><span class="doc">Synchronization</span></a> - Synchronization primitives</p></li>
+<li><p><a class="reference internal" href="../cheatsheets/rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Quick reference</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“Real-Time Systems” by Jane W.S. Liu</p></li>
+<li><p>“MicroC/OS-II: The Real-Time Kernel” by Jean Labrosse</p></li>
+<li><p>“Real-Time Concepts for Embedded Systems” by Qing Li and Caroline Yao</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/overview/rtos_basics.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

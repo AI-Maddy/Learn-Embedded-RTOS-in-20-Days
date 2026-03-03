@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ChibiOS/RT Cheat Sheet &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="chibios-rt-cheat-sheet">
+<h1>ChibiOS/RT Cheat Sheet<a class="headerlink" href="#chibios-rt-cheat-sheet" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h3>
+<p><strong>chconf.h</strong> - Key kernel settings:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define CH_CFG_ST_FREQUENCY                 1000    </span><span class="c1">// System tick (Hz)</span>
+<span class="cp">#define CH_CFG_ST_TIMEDELTA                 0       </span><span class="c1">// Tickless idle</span>
+<span class="cp">#define CH_CFG_TIME_QUANTUM                 20      </span><span class="c1">// Round-robin quantum</span>
+<span class="cp">#define CH_CFG_MEMCORE_SIZE                 0       </span><span class="c1">// Core allocator size</span>
+<span class="cp">#define CH_CFG_NO_IDLE_THREAD               FALSE</span>
+<span class="cp">#define CH_CFG_OPTIMIZE_SPEED               TRUE</span>
+<span class="cp">#define CH_CFG_USE_REGISTRY                 TRUE</span>
+<span class="cp">#define CH_CFG_USE_WAITEXIT                 TRUE</span>
+<span class="cp">#define CH_CFG_USE_SEMAPHORES               TRUE</span>
+<span class="cp">#define CH_CFG_USE_MUTEXES                  TRUE</span>
+<span class="cp">#define CH_CFG_USE_CONDVARS                 TRUE</span>
+<span class="cp">#define CH_CFG_USE_EVENTS                   TRUE</span>
+<span class="cp">#define CH_CFG_USE_MESSAGES                 TRUE</span>
+<span class="cp">#define CH_CFG_USE_MAILBOXES                TRUE</span>
+<span class="cp">#define CH_CFG_USE_MEMCORE                  TRUE</span>
+<span class="cp">#define CH_CFG_USE_HEAP                     TRUE</span>
+<span class="cp">#define CH_CFG_USE_MEMPOOLS                 TRUE</span>
+<span class="cp">#define CH_CFG_USE_OBJ_FIFOS                TRUE</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="thread-api">
+<h2>Thread API<a class="headerlink" href="#thread-api" title="Link to this heading">¶</a></h2>
+<section id="create-start">
+<h3>Create/Start<a class="headerlink" href="#create-start" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;ch.h&quot;</span>
+
+<span class="c1">// Thread function signature</span>
+<span class="k">static</span><span class="w"> </span><span class="n">THD_FUNCTION</span><span class="p">(</span><span class="n">MyThread</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">arg</span><span class="p">;</span><span class="w">  </span><span class="c1">// Unused parameter</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="nb">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Thread body</span>
+<span class="w">        </span><span class="n">chThdSleepMilliseconds</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Static thread with working area</span>
+<span class="k">static</span><span class="w"> </span><span class="n">THD_WORKING_AREA</span><span class="p">(</span><span class="n">waMyThread</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">);</span><span class="w">  </span><span class="c1">// 128 bytes stack</span>
+
+<span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chThdCreateStatic</span><span class="p">(</span>
+<span class="w">    </span><span class="n">waMyThread</span><span class="p">,</span>
+<span class="w">    </span><span class="k">sizeof</span><span class="p">(</span><span class="n">waMyThread</span><span class="p">),</span>
+<span class="w">    </span><span class="n">NORMALPRIO</span><span class="p">,</span><span class="w">         </span><span class="c1">// Priority</span>
+<span class="w">    </span><span class="n">MyThread</span><span class="p">,</span><span class="w">           </span><span class="c1">// Function</span>
+<span class="w">    </span><span class="nb">NULL</span><span class="w">                </span><span class="c1">// Argument</span>
+<span class="p">);</span>
+
+<span class="c1">// Dynamic thread creation</span>
+<span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chThdCreateFromHeap</span><span class="p">(</span>
+<span class="w">    </span><span class="nb">NULL</span><span class="p">,</span><span class="w">               </span><span class="c1">// Heap (NULL = default)</span>
+<span class="w">    </span><span class="n">THD_WORKING_AREA_SIZE</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+<span class="w">    </span><span class="s">&quot;mythread&quot;</span><span class="p">,</span><span class="w">         </span><span class="c1">// Name</span>
+<span class="w">    </span><span class="n">NORMALPRIO</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MyThread</span><span class="p">,</span>
+<span class="w">    </span><span class="nb">NULL</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="sleep-delay">
+<h3>Sleep/Delay<a class="headerlink" href="#sleep-delay" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Sleep functions</span>
+<span class="n">chThdSleepMilliseconds</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="n">chThdSleepMicroseconds</span><span class="p">(</span><span class="mi">500</span><span class="p">);</span>
+<span class="n">chThdSleepSeconds</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">chThdSleep</span><span class="p">(</span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span><span class="w">         </span><span class="c1">// Ticks</span>
+<span class="n">chThdSleepUntil</span><span class="p">(</span><span class="n">deadline</span><span class="p">);</span><span class="w">           </span><span class="c1">// Absolute time</span>
+
+<span class="c1">// Yield</span>
+<span class="n">chThdYield</span><span class="p">();</span>
+
+<span class="c1">// Time conversion macros</span>
+<span class="n">TIME_MS2I</span><span class="p">(</span><span class="n">ms</span><span class="p">)</span><span class="w">       </span><span class="c1">// Milliseconds to ticks</span>
+<span class="n">TIME_US2I</span><span class="p">(</span><span class="n">us</span><span class="p">)</span><span class="w">       </span><span class="c1">// Microseconds to ticks</span>
+<span class="n">TIME_S2I</span><span class="p">(</span><span class="n">s</span><span class="p">)</span><span class="w">         </span><span class="c1">// Seconds to ticks</span>
+<span class="n">TIME_I2MS</span><span class="p">(</span><span class="n">ticks</span><span class="p">)</span><span class="w">    </span><span class="c1">// Ticks to milliseconds</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-control">
+<h3>Priority/Control<a class="headerlink" href="#priority-control" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set priority</span>
+<span class="n">tprio_t</span><span class="w"> </span><span class="n">oldprio</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chThdSetPriority</span><span class="p">(</span><span class="n">NORMALPRIO</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="c1">// Get priority</span>
+<span class="n">tprio_t</span><span class="w"> </span><span class="n">prio</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chThdGetPriorityX</span><span class="p">();</span>
+
+<span class="c1">// Suspend/Resume</span>
+<span class="n">chThdSuspendS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">tr</span><span class="p">);</span><span class="w">     </span><span class="c1">// System locked version</span>
+<span class="n">chThdResumeS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">tr</span><span class="p">,</span><span class="w"> </span><span class="n">MSG_OK</span><span class="p">);</span>
+
+<span class="c1">// Terminate thread</span>
+<span class="n">chThdTerminate</span><span class="p">(</span><span class="n">tp</span><span class="p">);</span><span class="w">     </span><span class="c1">// Request termination</span>
+<span class="n">chThdExit</span><span class="p">(</span><span class="n">MSG_OK</span><span class="p">);</span><span class="w">      </span><span class="c1">// Exit self</span>
+<span class="n">chThdWait</span><span class="p">(</span><span class="n">tp</span><span class="p">);</span><span class="w">          </span><span class="c1">// Wait for termination</span>
+
+<span class="c1">// Check termination request</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">chThdShouldTerminateX</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">chThdExit</span><span class="p">(</span><span class="n">MSG_OK</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="thread-info">
+<h3>Thread Info<a class="headerlink" href="#thread-info" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get current thread</span>
+<span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chThdGetSelfX</span><span class="p">();</span>
+
+<span class="c1">// Get thread state</span>
+<span class="n">tstate_t</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tp</span><span class="o">-&gt;</span><span class="n">state</span><span class="p">;</span>
+<span class="c1">// States: CH_STATE_READY, CH_STATE_CURRENT, CH_STATE_SLEEPING, etc.</span>
+
+<span class="c1">// Get thread name</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chRegGetThreadNameX</span><span class="p">(</span><span class="n">tp</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="semaphore-api">
+<h2>Semaphore API<a class="headerlink" href="#semaphore-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;ch.h&quot;</span>
+
+<span class="c1">// Define semaphore</span>
+<span class="n">semaphore_t</span><span class="w"> </span><span class="n">sem</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chSemObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w">           </span><span class="c1">// Binary (n=0)</span>
+<span class="n">chSemObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">);</span><span class="w">           </span><span class="c1">// Counting (n=5)</span>
+
+<span class="c1">// Wait (decrement)</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chSemWait</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chSemWaitTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chSemWaitTimeoutS</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span><span class="w">  </span><span class="c1">// S-class</span>
+
+<span class="c1">// Signal (increment)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chSemSignal</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chSemSignalI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span><span class="w">            </span><span class="c1">// I-class (from ISR)</span>
+
+<span class="c1">// Get counter</span>
+<span class="n">cnt_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chSemGetCounterI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">);</span>
+
+<span class="c1">// Reset</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chSemReset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">cnt_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chSemResetI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">sem</span><span class="p">,</span><span class="w"> </span><span class="n">cnt_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mutex-api">
+<h2>Mutex API<a class="headerlink" href="#mutex-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define mutex</span>
+<span class="n">mutex_t</span><span class="w"> </span><span class="n">mtx</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chMtxObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+
+<span class="c1">// Lock</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chMtxLock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">chMtxTryLock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMtxLockTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Unlock</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chMtxUnlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chMtxUnlockAll</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span><span class="w">          </span><span class="c1">// Unlock all mutexes owned by thread</span>
+
+<span class="c1">// Get next waiting thread</span>
+<span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chMtxGetNextMutexX</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Supports priority inheritance and priority ceiling</strong></p>
+</section>
+<section id="condition-variable-api">
+<h2>Condition Variable API<a class="headerlink" href="#condition-variable-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define</span>
+<span class="n">condition_variable_t</span><span class="w"> </span><span class="n">cond</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chCondObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+
+<span class="c1">// Wait (releases mutex, reacquires on wake)</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chCondWait</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chCondWaitTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Signal one waiter</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chCondSignal</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chCondSignalI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+
+<span class="c1">// Signal all waiters (broadcast)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chCondBroadcast</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chCondBroadcastI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+
+<span class="c1">// Example usage</span>
+<span class="n">chMtxLock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">condition</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">chCondWait</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cond</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="c1">// Process</span>
+<span class="n">chMtxUnlock</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mtx</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="event-api">
+<h2>Event API<a class="headerlink" href="#event-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Events are built into thread structure</span>
+
+<span class="c1">// Wait for events</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitAny</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitAll</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitAnyTimeout</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitAllTimeout</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Wait with callback</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitOne</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">event</span><span class="p">);</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtWaitOneTimeout</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Signal events to thread</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chEvtSignal</span><span class="p">(</span><span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="p">,</span><span class="w"> </span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chEvtSignalI</span><span class="p">(</span><span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="p">,</span><span class="w"> </span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+
+<span class="c1">// Broadcast to all threads</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chEvtBroadcast</span><span class="p">(</span><span class="n">event_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">esp</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chEvtBroadcastI</span><span class="p">(</span><span class="n">event_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">esp</span><span class="p">);</span>
+
+<span class="c1">// Clear events</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtGetAndClearEvents</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+
+<span class="c1">// Add flags</span>
+<span class="n">eventmask_t</span><span class="w"> </span><span class="nf">chEvtAddEvents</span><span class="p">(</span><span class="n">eventmask_t</span><span class="w"> </span><span class="n">events</span><span class="p">);</span>
+</pre></div>
+</div>
+<section id="event-sources">
+<h3>Event Sources<a class="headerlink" href="#event-sources" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Event source (for pub/sub pattern)</span>
+<span class="n">event_source_t</span><span class="w"> </span><span class="n">event_src</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chEvtObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">event_src</span><span class="p">);</span>
+
+<span class="c1">// Register listener</span>
+<span class="n">event_listener_t</span><span class="w"> </span><span class="n">listener</span><span class="p">;</span>
+<span class="n">chEvtRegister</span><span class="p">(</span><span class="o">&amp;</span><span class="n">event_src</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">listener</span><span class="p">,</span><span class="w"> </span><span class="n">EVENT_MASK</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span>
+
+<span class="c1">// Unregister</span>
+<span class="n">chEvtUnregister</span><span class="p">(</span><span class="o">&amp;</span><span class="n">event_src</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">listener</span><span class="p">);</span>
+
+<span class="c1">// Broadcast event</span>
+<span class="n">chEvtBroadcast</span><span class="p">(</span><span class="o">&amp;</span><span class="n">event_src</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mailbox-api">
+<h2>Mailbox API<a class="headerlink" href="#mailbox-api" title="Link to this heading">¶</a></h2>
+<p>FIFO queue for messages:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define</span>
+<span class="n">mailbox_t</span><span class="w"> </span><span class="n">mb</span><span class="p">;</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">mb_buffer</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span><span class="w">     </span><span class="c1">// 8 message slots</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chMBObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="n">mb_buffer</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">);</span>
+
+<span class="c1">// Post (send)</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBPostTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBPostI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBPostAheadTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span><span class="w">  </span><span class="c1">// Urgent</span>
+
+<span class="c1">// Fetch (receive)</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBFetchTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBFetchI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">);</span>
+
+<span class="c1">// Peek</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chMBPeekI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+
+<span class="c1">// Status</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">chMBGetUsedCountI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">chMBGetFreeCountI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+
+<span class="c1">// Reset</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chMBReset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chMBResetI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="object-fifo-api">
+<h2>Object FIFO API<a class="headerlink" href="#object-fifo-api" title="Link to this heading">¶</a></h2>
+<p>For typed object queues:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;chobjfifos.h&quot;</span>
+
+<span class="c1">// Define</span>
+<span class="n">objects_fifo_t</span><span class="w"> </span><span class="n">fifo</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chFifoObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">objsize</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">objn</span><span class="p">,</span>
+<span class="w">                      </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">objbuf</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">msgbuf</span><span class="p">);</span>
+
+<span class="c1">// Post object</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chFifoSendObjectTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chFifoSendObjectI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+
+<span class="c1">// Receive object</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chFifoReceiveObjectTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="n">objpp</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="nf">chFifoReceiveObjectI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="n">objpp</span><span class="p">);</span>
+
+<span class="c1">// Release object</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chFifoReturnObject</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chFifoReturnObjectI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">fifo</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="synchronous-messages">
+<h2>Synchronous Messages<a class="headerlink" href="#synchronous-messages" title="Link to this heading">¶</a></h2>
+<p>Direct thread-to-thread messages:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Server thread waits for message</span>
+<span class="n">thread_t</span><span class="w"> </span><span class="o">*</span><span class="n">tp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chMsgWait</span><span class="p">();</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chMsgGet</span><span class="p">(</span><span class="n">tp</span><span class="p">);</span>
+
+<span class="c1">// Process request</span>
+
+<span class="c1">// Send response</span>
+<span class="n">chMsgRelease</span><span class="p">(</span><span class="n">tp</span><span class="p">,</span><span class="w"> </span><span class="n">MSG_OK</span><span class="p">);</span>
+
+<span class="c1">// Client sends message and waits for response</span>
+<span class="n">msg_t</span><span class="w"> </span><span class="n">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chMsgSend</span><span class="p">(</span><span class="n">server_tp</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">msg_t</span><span class="p">)</span><span class="n">data</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="virtual-timers">
+<h2>Virtual Timers<a class="headerlink" href="#virtual-timers" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define</span>
+<span class="n">virtual_timer_t</span><span class="w"> </span><span class="n">vt</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chVTObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">);</span>
+
+<span class="c1">// Callback</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">timer_callback</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Called from ISR context!</span>
+<span class="w">    </span><span class="n">chSysLockFromISR</span><span class="p">();</span>
+<span class="w">    </span><span class="c1">// Do something</span>
+<span class="w">    </span><span class="n">chSysUnlockFromISR</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Set timer (one-shot)</span>
+<span class="n">chVTSet</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">),</span><span class="w"> </span><span class="n">timer_callback</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="c1">// Set timer (periodic in callback)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">periodic_callback</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">chSysLockFromISR</span><span class="p">();</span>
+<span class="w">    </span><span class="c1">// Do work</span>
+<span class="w">    </span><span class="n">chVTSetI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">),</span><span class="w"> </span><span class="n">periodic_callback</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">    </span><span class="n">chSysUnlockFromISR</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Reset (cancel)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chVTReset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chVTResetI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">);</span>
+
+<span class="c1">// Check if armed</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">chVTIsArmed</span><span class="p">(</span><span class="o">&amp;</span><span class="n">vt</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-management">
+<h2>Memory Management<a class="headerlink" href="#memory-management" title="Link to this heading">¶</a></h2>
+<section id="core-allocator">
+<h3>Core Allocator<a class="headerlink" href="#core-allocator" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Allocate from core (no free!)</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">chCoreAlloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">chCoreAllocAligned</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">align</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="heap">
+<h3>Heap<a class="headerlink" href="#heap" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Heap allocation</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">chHeapAlloc</span><span class="p">(</span><span class="n">memory_heap_t</span><span class="w"> </span><span class="o">*</span><span class="n">heapp</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chHeapFree</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">);</span>
+
+<span class="c1">// Default heap</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chHeapAlloc</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="n">chHeapFree</span><span class="p">(</span><span class="n">ptr</span><span class="p">);</span>
+
+<span class="c1">// Heap status</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">chHeapStatus</span><span class="p">(</span><span class="n">memory_heap_t</span><span class="w"> </span><span class="o">*</span><span class="n">heapp</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="o">*</span><span class="n">sizep</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="o">*</span><span class="n">largestp</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-pools">
+<h3>Memory Pools<a class="headerlink" href="#memory-pools" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define pool</span>
+<span class="n">memory_pool_t</span><span class="w"> </span><span class="n">mp</span><span class="p">;</span>
+
+<span class="c1">// Pool buffer (for N objects of size S)</span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">pool_buffer</span><span class="p">[</span><span class="n">N</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">MEM_ALIGN_SIZE</span><span class="p">(</span><span class="n">S</span><span class="p">)];</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chPoolObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">,</span><span class="w"> </span><span class="n">S</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="n">chPoolLoadArray</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">,</span><span class="w"> </span><span class="n">pool_buffer</span><span class="p">,</span><span class="w"> </span><span class="n">N</span><span class="p">);</span>
+
+<span class="c1">// Allocate object</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chPoolAlloc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chPoolAllocI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">);</span>
+
+<span class="c1">// Free object</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chPoolFree</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chPoolFreeI</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mp</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="guards-memory-pools-for-objects">
+<h3>Guards (Memory Pools for Objects)<a class="headerlink" href="#guards-memory-pools-for-objects" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Guarded pool (includes object counting)</span>
+<span class="n">guarded_memory_pool_t</span><span class="w"> </span><span class="n">gmp</span><span class="p">;</span>
+
+<span class="c1">// Initialize</span>
+<span class="n">chGuardedPoolObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">gmp</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="n">chGuardedPoolLoadArray</span><span class="p">(</span><span class="o">&amp;</span><span class="n">gmp</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">n</span><span class="p">);</span>
+
+<span class="c1">// Allocate with timeout</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">chGuardedPoolAllocTimeout</span><span class="p">(</span><span class="o">&amp;</span><span class="n">gmp</span><span class="p">,</span><span class="w"> </span><span class="n">sysinterval_t</span><span class="w"> </span><span class="n">timeout</span><span class="p">);</span>
+
+<span class="c1">// Free</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">chGuardedPoolFree</span><span class="p">(</span><span class="o">&amp;</span><span class="n">gmp</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">objp</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="critical-sections">
+<h2>Critical Sections<a class="headerlink" href="#critical-sections" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// System lock (disable scheduler + interrupts)</span>
+<span class="n">chSysLock</span><span class="p">();</span>
+<span class="c1">// Critical code</span>
+<span class="n">chSysUnlock</span><span class="p">();</span>
+
+<span class="c1">// From ISR</span>
+<span class="n">chSysLockFromISR</span><span class="p">();</span>
+<span class="c1">// Critical code</span>
+<span class="n">chSysUnlockFromISR</span><span class="p">();</span>
+
+<span class="c1">// Suspend scheduler only (interrupts enabled)</span>
+<span class="n">chSchLock</span><span class="p">();</span>
+<span class="c1">// No context switches</span>
+<span class="n">chSchUnlock</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="system-functions">
+<h2>System Functions<a class="headerlink" href="#system-functions" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get system time</span>
+<span class="n">systime_t</span><span class="w"> </span><span class="n">time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chVTGetSystemTimeX</span><span class="p">();</span>
+
+<span class="c1">// Check if time expired</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">expired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chVTTimeElapsedSinceX</span><span class="p">(</span><span class="n">time</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">TIME_MS2I</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+
+<span class="c1">// Kernel info</span>
+<span class="k">const</span><span class="w"> </span><span class="n">ch_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">chSysGetInfo</span><span class="p">();</span>
+
+<span class="c1">// Halt system</span>
+<span class="n">chSysHalt</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">reason</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="api-classes">
+<h2>API Classes<a class="headerlink" href="#api-classes" title="Link to this heading">¶</a></h2>
+<p>ChibiOS uses naming conventions for different contexts:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Normal API:     chXxxYyy()      Can block, only from thread context
+S-class API:    chXxxYyyS()     System locked, no blocking
+I-class API:    chXxxYyyI()     From ISR or system locked, no blocking
+X-class API:    chXxxYyyX()     Any context, usually just queries
+</pre></div>
+</div>
+</section>
+<section id="example-application">
+<h2>Example Application<a class="headerlink" href="#example-application" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;ch.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;hal.h&quot;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="n">THD_WORKING_AREA</span><span class="p">(</span><span class="n">waProducer</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">);</span>
+<span class="k">static</span><span class="w"> </span><span class="n">THD_FUNCTION</span><span class="p">(</span><span class="n">Producer</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="n">arg</span><span class="p">;</span>
+<span class="w">    </span><span class="n">mailbox_t</span><span class="w"> </span><span class="o">*</span><span class="n">mbp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">mailbox_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">arg</span><span class="p">;</span>
+<span class="w">    </span><span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="nb">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">chMBPostTimeout</span><span class="p">(</span><span class="n">mbp</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_INFINITE</span><span class="p">);</span>
+<span class="w">        </span><span class="n">msg</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">chThdSleepMilliseconds</span><span class="p">(</span><span class="mi">1000</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">static</span><span class="w"> </span><span class="n">THD_WORKING_AREA</span><span class="p">(</span><span class="n">waConsumer</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">);</span>
+<span class="k">static</span><span class="w"> </span><span class="n">THD_FUNCTION</span><span class="p">(</span><span class="n">Consumer</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">mailbox_t</span><span class="w"> </span><span class="o">*</span><span class="n">mbp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">mailbox_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">arg</span><span class="p">;</span>
+<span class="w">    </span><span class="n">msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="nb">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">chMBFetchTimeout</span><span class="p">(</span><span class="n">mbp</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">TIME_INFINITE</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">MSG_OK</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Process msg</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">halInit</span><span class="p">();</span>
+<span class="w">    </span><span class="n">chSysInit</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Create mailbox</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">mailbox_t</span><span class="w"> </span><span class="n">mb</span><span class="p">;</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">msg_t</span><span class="w"> </span><span class="n">mb_buffer</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span>
+<span class="w">    </span><span class="n">chMBObjectInit</span><span class="p">(</span><span class="o">&amp;</span><span class="n">mb</span><span class="p">,</span><span class="w"> </span><span class="n">mb_buffer</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Create threads</span>
+<span class="w">    </span><span class="n">chThdCreateStatic</span><span class="p">(</span><span class="n">waProducer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">waProducer</span><span class="p">),</span>
+<span class="w">                     </span><span class="n">NORMALPRIO</span><span class="p">,</span><span class="w"> </span><span class="n">Producer</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+<span class="w">    </span><span class="n">chThdCreateStatic</span><span class="p">(</span><span class="n">waConsumer</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">waConsumer</span><span class="p">),</span>
+<span class="w">                     </span><span class="n">NORMALPRIO</span><span class="p">,</span><span class="w"> </span><span class="n">Consumer</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">mb</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="nb">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">chThdSleepMilliseconds</span><span class="p">(</span><span class="mi">1000</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>✗ Calling S-class functions without system lock
+✗ Calling normal functions from ISR (use I-class)
+✗ Not calling halInit() and chSysInit()
+✗ Insufficient working area size
+✗ Using blocking calls in S/I-class contexts
+✗ Forgetting to enable features in chconf.h
+✗ Not handling MSG_RESET, MSG_TIMEOUT return values
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Generic RTOS concepts</p></li>
+<li><p><a class="reference internal" href="../days/day13.html"><span class="doc">Day 13 - ChibiOS</span></a> - ChibiOS deep dive</p></li>
+<li><p>Official ChibiOS documentation: chibios.org</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cheatsheets/chibios_cheatsheet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>FreeRTOS Cheat Sheet &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="freertos-cheat-sheet">
+<h1>FreeRTOS Cheat Sheet<a class="headerlink" href="#freertos-cheat-sheet" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<section id="configuration">
+<h3>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h3>
+<p><strong>FreeRTOSConfig.h</strong> - Key settings:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define configUSE_PREEMPTION                1</span>
+<span class="cp">#define configUSE_IDLE_HOOK                 0</span>
+<span class="cp">#define configUSE_TICK_HOOK                 0</span>
+<span class="cp">#define configCPU_CLOCK_HZ                  168000000</span>
+<span class="cp">#define configTICK_RATE_HZ                  1000</span>
+<span class="cp">#define configMAX_PRIORITIES                5</span>
+<span class="cp">#define configMINIMAL_STACK_SIZE            128</span>
+<span class="cp">#define configTOTAL_HEAP_SIZE               20480</span>
+<span class="cp">#define configMAX_TASK_NAME_LEN             16</span>
+<span class="cp">#define configUSE_16_BIT_TICKS              0</span>
+<span class="cp">#define configIDLE_SHOULD_YIELD             1</span>
+<span class="cp">#define configUSE_MUTEXES                   1</span>
+<span class="cp">#define configUSE_COUNTING_SEMAPHORES       1</span>
+<span class="cp">#define configUSE_QUEUE_SETS                1</span>
+<span class="cp">#define configQUEUE_REGISTRY_SIZE           10</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="task-api">
+<h2>Task API<a class="headerlink" href="#task-api" title="Link to this heading">¶</a></h2>
+<section id="create-delete">
+<h3>Create/Delete<a class="headerlink" href="#create-delete" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Dynamic creation</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="n">xTaskCreate</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TaskFunction_t</span><span class="w"> </span><span class="n">pvTaskCode</span><span class="p">,</span><span class="w">    </span><span class="c1">// Task function</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">pcName</span><span class="p">,</span><span class="w">     </span><span class="c1">// Name (debug)</span>
+<span class="w">    </span><span class="n">configSTACK_DEPTH_TYPE</span><span class="w"> </span><span class="n">usStackDepth</span><span class="p">,</span><span class="w">  </span><span class="c1">// Words</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">,</span><span class="w">             </span><span class="c1">// Parameter</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxPriority</span><span class="p">,</span><span class="w">         </span><span class="c1">// Priority (0=lowest)</span>
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxCreatedTask</span><span class="w">     </span><span class="c1">// Handle (or NULL)</span>
+<span class="p">);</span>
+
+<span class="c1">// Static creation (no dynamic allocation)</span>
+<span class="n">TaskHandle_t</span><span class="w"> </span><span class="nf">xTaskCreateStatic</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TaskFunction_t</span><span class="w"> </span><span class="n">pvTaskCode</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">pcName</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulStackDepth</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxPriority</span><span class="p">,</span>
+<span class="w">    </span><span class="n">StackType_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">puxStackBuffer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">StaticTask_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">pxTaskBuffer</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskDelete</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">);</span><span class="w">  </span><span class="c1">// NULL = delete self</span>
+</pre></div>
+</div>
+</section>
+<section id="delay-blocking">
+<h3>Delay/Blocking<a class="headerlink" href="#delay-blocking" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Delay (relative, can drift)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskDelay</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToDelay</span><span class="p">);</span>
+
+<span class="c1">// Delay until (absolute, no drift)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskDelayUntil</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxPreviousWakeTime</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTimeIncrement</span>
+<span class="p">);</span>
+
+<span class="c1">// Example periodic task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vPeriodicTask</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xLastWakeTime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xFrequency</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Work here</span>
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">xLastWakeTime</span><span class="p">,</span><span class="w"> </span><span class="n">xFrequency</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-suspend">
+<h3>Priority/Suspend<a class="headerlink" href="#priority-suspend" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Change priority</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskPrioritySet</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">,</span><span class="w"> </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxNewPriority</span><span class="p">);</span>
+<span class="n">UBaseType_t</span><span class="w"> </span><span class="nf">uxTaskPriorityGet</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">);</span>
+
+<span class="c1">// Suspend/Resume</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskSuspend</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToSuspend</span><span class="p">);</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskResume</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToResume</span><span class="p">);</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTaskResumeFromISR</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToResume</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="info-debug">
+<h3>Info/Debug<a class="headerlink" href="#info-debug" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get current task handle</span>
+<span class="n">TaskHandle_t</span><span class="w"> </span><span class="nf">xTaskGetCurrentTaskHandle</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Get task by name</span>
+<span class="n">TaskHandle_t</span><span class="w"> </span><span class="nf">xTaskGetHandle</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">pcNameToQuery</span><span class="p">);</span>
+
+<span class="c1">// Stack high water mark (minimum free stack ever)</span>
+<span class="n">UBaseType_t</span><span class="w"> </span><span class="nf">uxTaskGetStackHighWaterMark</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">);</span>
+
+<span class="c1">// Get task state</span>
+<span class="n">eTaskState</span><span class="w"> </span><span class="nf">eTaskGetState</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">);</span>
+<span class="c1">// Returns: eRunning, eReady, eBlocked, eSuspended, eDeleted</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="semaphore-api">
+<h2>Semaphore API<a class="headerlink" href="#semaphore-api" title="Link to this heading">¶</a></h2>
+<section id="binary-semaphore">
+<h3>Binary Semaphore<a class="headerlink" href="#binary-semaphore" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateBinary</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateBinaryStatic</span><span class="p">(</span><span class="n">StaticSemaphore_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxBuffer</span><span class="p">);</span>
+
+<span class="c1">// Take (wait)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xSemaphoreTake</span><span class="p">(</span>
+<span class="w">    </span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">xSemaphore</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Give (signal)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xSemaphoreGive</span><span class="p">(</span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">xSemaphore</span><span class="p">);</span>
+
+<span class="c1">// From ISR</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xSemaphoreGiveFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">xSemaphore</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xSemaphoreTakeFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">xSemaphore</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="counting-semaphore">
+<h3>Counting Semaphore<a class="headerlink" href="#counting-semaphore" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateCounting</span><span class="p">(</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxMaxCount</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxInitialCount</span>
+<span class="p">);</span>
+
+<span class="c1">// Same give/take as binary semaphore</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mutex-api">
+<h2>Mutex API<a class="headerlink" href="#mutex-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateMutex</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateMutexStatic</span><span class="p">(</span><span class="n">StaticSemaphore_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxBuffer</span><span class="p">);</span>
+
+<span class="c1">// Recursive mutex (can be taken multiple times by same task)</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="nf">xSemaphoreCreateRecursiveMutex</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+
+<span class="c1">// Take/Give mutex (same API as semaphore)</span>
+<span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">xMutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">xMutex</span><span class="p">);</span>
+
+<span class="c1">// Recursive mutex (different API)</span>
+<span class="n">xSemaphoreTakeRecursive</span><span class="p">(</span><span class="n">xMutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="n">xSemaphoreGiveRecursive</span><span class="p">(</span><span class="n">xMutex</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Never call from ISR!</strong></p>
+</section>
+<section id="queue-api">
+<h2>Queue API<a class="headerlink" href="#queue-api" title="Link to this heading">¶</a></h2>
+<section id="id1">
+<h3>Create/Delete<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="nf">xQueueCreate</span><span class="p">(</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxQueueLength</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxItemSize</span>
+<span class="p">);</span>
+
+<span class="c1">// Static</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="nf">xQueueCreateStatic</span><span class="p">(</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxQueueLength</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxItemSize</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">pucQueueStorageBuffer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">StaticQueue_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxQueueBuffer</span>
+<span class="p">);</span>
+
+<span class="c1">// Delete</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vQueueDelete</span><span class="p">(</span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="send-receive">
+<h3>Send/Receive<a class="headerlink" href="#send-receive" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Send to back (FIFO)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueSend</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvItemToQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Send to front (urgent)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueSendToFront</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvItemToQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Receive</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueReceive</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvBuffer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Peek (don&#39;t remove)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueuePeek</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvBuffer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// From ISR</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueSendFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvItemToQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueReceiveFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvBuffer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="info">
+<h3>Info<a class="headerlink" href="#info" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Number of messages waiting</span>
+<span class="n">UBaseType_t</span><span class="w"> </span><span class="nf">uxQueueMessagesWaiting</span><span class="p">(</span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">);</span>
+
+<span class="c1">// Number of free spaces</span>
+<span class="n">UBaseType_t</span><span class="w"> </span><span class="nf">uxQueueSpacesAvailable</span><span class="p">(</span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">);</span>
+
+<span class="c1">// Reset queue (empty it)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xQueueReset</span><span class="p">(</span><span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="event-groups-api">
+<h2>Event Groups API<a class="headerlink" href="#event-groups-api" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="nf">xEventGroupCreate</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="nf">xEventGroupCreateStatic</span><span class="p">(</span><span class="n">StaticEventGroup_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxBuffer</span><span class="p">);</span>
+
+<span class="c1">// Set bits</span>
+<span class="n">EventBits_t</span><span class="w"> </span><span class="nf">xEventGroupSetBits</span><span class="p">(</span>
+<span class="w">    </span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">xEventGroup</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToSet</span>
+<span class="p">);</span>
+
+<span class="n">EventBits_t</span><span class="w"> </span><span class="nf">xEventGroupSetBitsFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">xEventGroup</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToSet</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+
+<span class="c1">// Wait for bits</span>
+<span class="n">EventBits_t</span><span class="w"> </span><span class="nf">xEventGroupWaitBits</span><span class="p">(</span>
+<span class="w">    </span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">xEventGroup</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToWaitFor</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">xClearOnExit</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">xWaitForAllBits</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Clear bits</span>
+<span class="n">EventBits_t</span><span class="w"> </span><span class="nf">xEventGroupClearBits</span><span class="p">(</span>
+<span class="w">    </span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">xEventGroup</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToClear</span>
+<span class="p">);</span>
+
+<span class="c1">// Sync (barrier)</span>
+<span class="n">EventBits_t</span><span class="w"> </span><span class="nf">xEventGroupSync</span><span class="p">(</span>
+<span class="w">    </span><span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">xEventGroup</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToSet</span><span class="p">,</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">uxBitsToWaitFor</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="task-notifications">
+<h2>Task Notifications<a class="headerlink" href="#task-notifications" title="Link to this heading">¶</a></h2>
+<p>Faster alternative to semaphores/queues for simple signaling:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Give notification (like semaphore give)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTaskNotifyGive</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToNotify</span><span class="p">);</span>
+
+<span class="c1">// From ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vTaskNotifyGiveFromISR</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToNotify</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="o">*</span><span class="n">pxHigherPriorityTaskWoken</span>
+<span class="p">);</span>
+
+<span class="c1">// Take notification (like semaphore take)</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="nf">ulTaskNotifyTake</span><span class="p">(</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">xClearCountOnExit</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+
+<span class="c1">// Send value</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTaskNotify</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTaskToNotify</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulValue</span><span class="p">,</span>
+<span class="w">    </span><span class="n">eNotifyAction</span><span class="w"> </span><span class="n">eAction</span><span class="w">  </span><span class="c1">// eSetBits, eIncrement, eSetValueWithOverwrite, etc.</span>
+<span class="p">);</span>
+
+<span class="c1">// Wait for notification</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTaskNotifyWait</span><span class="p">(</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulBitsToClearOnEntry</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulBitsToClearOnExit</span><span class="p">,</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">pulNotificationValue</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="memory-management">
+<h2>Memory Management<a class="headerlink" href="#memory-management" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Allocate</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">pvPortMalloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">xWantedSize</span><span class="p">);</span>
+
+<span class="c1">// Free</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vPortFree</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pv</span><span class="p">);</span>
+
+<span class="c1">// Heap info</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">xPortGetFreeHeapSize</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="nf">xPortGetMinimumEverFreeHeapSize</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="critical-sections">
+<h2>Critical Sections<a class="headerlink" href="#critical-sections" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Disable interrupts</span>
+<span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="c1">// Critical code (very short!)</span>
+<span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+<span class="c1">// From ISR</span>
+<span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxSavedInterruptStatus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taskENTER_CRITICAL_FROM_ISR</span><span class="p">();</span>
+<span class="c1">// Critical code</span>
+<span class="n">taskEXIT_CRITICAL_FROM_ISR</span><span class="p">(</span><span class="n">uxSavedInterruptStatus</span><span class="p">);</span>
+
+<span class="c1">// Suspend scheduler</span>
+<span class="n">vTaskSuspendAll</span><span class="p">();</span>
+<span class="c1">// No context switches (interrupts still active)</span>
+<span class="n">xTaskResumeAll</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="timers-software-timers">
+<h2>Timers (Software Timers)<a class="headerlink" href="#timers-software-timers" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create</span>
+<span class="n">TimerHandle_t</span><span class="w"> </span><span class="nf">xTimerCreate</span><span class="p">(</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">pcTimerName</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTimerPeriodInTicks</span><span class="p">,</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">uxAutoReload</span><span class="p">,</span><span class="w">  </span><span class="c1">// pdTRUE = auto-reload</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">pvTimerID</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TimerCallbackFunction_t</span><span class="w"> </span><span class="n">pxCallbackFunction</span>
+<span class="p">);</span>
+
+<span class="c1">// Start/Stop</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTimerStart</span><span class="p">(</span><span class="n">TimerHandle_t</span><span class="w"> </span><span class="n">xTimer</span><span class="p">,</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span><span class="p">);</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTimerStop</span><span class="p">(</span><span class="n">TimerHandle_t</span><span class="w"> </span><span class="n">xTimer</span><span class="p">,</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span><span class="p">);</span>
+
+<span class="c1">// Reset (restart)</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTimerReset</span><span class="p">(</span><span class="n">TimerHandle_t</span><span class="w"> </span><span class="n">xTimer</span><span class="p">,</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span><span class="p">);</span>
+
+<span class="c1">// Change period</span>
+<span class="n">BaseType_t</span><span class="w"> </span><span class="nf">xTimerChangePeriod</span><span class="p">(</span>
+<span class="w">    </span><span class="n">TimerHandle_t</span><span class="w"> </span><span class="n">xTimer</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xNewPeriod</span><span class="p">,</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">xTicksToWait</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="utility-macros">
+<h2>Utility Macros<a class="headerlink" href="#utility-macros" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Time conversion</span>
+<span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="n">ms</span><span class="p">)</span><span class="w">        </span><span class="c1">// Milliseconds to ticks</span>
+<span class="n">portTICK_PERIOD_MS</span><span class="w">       </span><span class="c1">// Tick period in ms</span>
+
+<span class="c1">// Timeouts</span>
+<span class="n">portMAX_DELAY</span><span class="w">            </span><span class="c1">// Block forever</span>
+
+<span class="c1">// Return values</span>
+<span class="n">pdTRUE</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">pdPASS</span><span class="w">          </span><span class="c1">// Success</span>
+<span class="n">pdFALSE</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">pdFAIL</span><span class="w">         </span><span class="c1">// Failure</span>
+
+<span class="c1">// ISR yield</span>
+<span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">xHigherPriorityTaskWoken</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="heap-schemes">
+<h2>Heap Schemes<a class="headerlink" href="#heap-schemes" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>heap_1.c: Simple, no free, smallest code
+heap_2.c: Allow free, best fit, can fragment
+heap_3.c: Wraps malloc/free
+heap_4.c: Coalescence, recommended for most
+heap_5.c: Multiple regions, like heap_4
+</pre></div>
+</div>
+<p>Select in FreeRTOSConfig.h or Makefile</p>
+</section>
+<section id="example-application">
+<h2>Example Application<a class="headerlink" href="#example-application" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;FreeRTOS.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;task.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;queue.h&quot;</span>
+
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">xQueue</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">vProducerTask</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulValueToSend</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">xQueue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ulValueToSend</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">        </span><span class="n">ulValueToSend</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">vConsumerTask</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pvParameters</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ulReceivedValue</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">xQueue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ulReceivedValue</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Received: %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">ulReceivedValue</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xQueue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="n">xTaskCreate</span><span class="p">(</span><span class="n">vProducerTask</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Producer&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="w">    </span><span class="n">xTaskCreate</span><span class="p">(</span><span class="n">vConsumerTask</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Consumer&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">vTaskStartScheduler</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(;;);</span><span class="w">  </span><span class="c1">// Should never reach here</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>✗ Using vTaskDelay() instead of vTaskDelayUntil()
+✗ Not checking return values
+✗ Using mutex from ISR
+✗ Forgetting portYIELD_FROM_ISR()
+✗ Stack too small (use uxTaskGetStackHighWaterMark())
+✗ Heap too small (use xPortGetFreeHeapSize())
+✗ Priority 0 = idle priority (use 1+)
+✗ Using delay(0) expecting yield (use taskYIELD())
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="rtos_basics_cheatsheet.html"><span class="doc">RTOS Basics Cheat Sheet</span></a> - Generic RTOS concepts</p></li>
+<li><p><a class="reference internal" href="../days/day11.html"><span class="doc">Day 11 - FreeRTOS</span></a> - FreeRTOS deep dive</p></li>
+<li><p>Official FreeRTOS documentation: freertos.org</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cheatsheets/freertos_cheatsheet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

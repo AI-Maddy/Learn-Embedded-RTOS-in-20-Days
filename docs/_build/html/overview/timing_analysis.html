@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Timing Analysis &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="timing-analysis">
+<h1>Timing Analysis<a class="headerlink" href="#timing-analysis" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>Timing analysis</strong> is critical for real-time systems to ensure they meet their temporal requirements. This involves measuring and analyzing:</p>
+<ul class="simple">
+<li><p><strong>WCET</strong> (Worst-Case Execution Time)</p></li>
+<li><p><strong>Response time</strong> (task activation to completion)</p></li>
+<li><p><strong>Latency</strong> (delay from stimulus to response)</p></li>
+<li><p><strong>Jitter</strong> (variation in timing)</p></li>
+</ul>
+<p>Proper timing analysis ensures the system is schedulable and meets all deadlines.</p>
+</section>
+<section id="key-timing-metrics">
+<h2>Key Timing Metrics<a class="headerlink" href="#key-timing-metrics" title="Link to this heading">¶</a></h2>
+<section id="worst-case-execution-time-wcet">
+<h3>Worst-Case Execution Time (WCET)<a class="headerlink" href="#worst-case-execution-time-wcet" title="Link to this heading">¶</a></h3>
+<p><strong>WCET</strong> is the maximum time a task or code segment can take to execute.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Time
+─────►
+│         ┌────────┐
+│         │  Task  │ ← Nominal case (typical)
+│         └────────┘
+│
+│         ┌──────────────┐
+│         │     Task     │ ← Average case
+│         └──────────────┘
+│
+│         ┌─────────────────────┐
+│         │        Task         │ ← Worst case (WCET)
+│         └─────────────────────┘
+</pre></div>
+</div>
+<p><strong>Factors affecting WCET:</strong>
+- Code path complexity (loops, branches)
+- Cache behavior
+- Memory access patterns
+- Interrupt preemption
+- DMA activity</p>
+</section>
+<section id="response-time">
+<h3>Response Time<a class="headerlink" href="#response-time" title="Link to this heading">¶</a></h3>
+<p><strong>Response time</strong> is the total time from task activation to completion, including:
+- Waiting time (for higher-priority tasks)
+- Preemption time
+- Execution time</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Task Released        Task Completes
+     │                     │
+     ▼                     ▼
+─────●═════════════════════●─────►
+     └──────────────────────┘
+        Response Time (R)
+</pre></div>
+</div>
+<div class="math notranslate nohighlight">
+\[R_i = C_i + I_i\]</div>
+<p>Where:
+- <span class="math notranslate nohighlight">\(R_i\)</span> = Response time of task i
+- <span class="math notranslate nohighlight">\(C_i\)</span> = Execution time of task i
+- <span class="math notranslate nohighlight">\(I_i\)</span> = Interference from higher-priority tasks</p>
+</section>
+<section id="latency">
+<h3>Latency<a class="headerlink" href="#latency" title="Link to this heading">¶</a></h3>
+<p><strong>Latency</strong> is the delay between an event and its response:</p>
+<ul class="simple">
+<li><p><strong>Interrupt latency</strong>: Event to ISR start</p></li>
+<li><p><strong>Task latency</strong>: Event to task execution</p></li>
+<li><p><strong>End-to-end latency</strong>: Input to output delay</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Measuring latency</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">measure_interrupt_latency</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// External event sets pin HIGH</span>
+<span class="w">    </span><span class="c1">// ISR measures time to entry</span>
+
+<span class="w">    </span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">latency_cycles</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">ISR_Handler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Read timestamp immediately</span>
+<span class="w">        </span><span class="n">latency_cycles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">event_timestamp</span><span class="p">;</span>
+
+<span class="w">        </span><span class="c1">// Process interrupt</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="jitter">
+<h3>Jitter<a class="headerlink" href="#jitter" title="Link to this heading">¶</a></h3>
+<p><strong>Jitter</strong> is the variation in timing (response time, latency, period).</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Expected periodic task execution:
+│   │   │   │   │   │
+▼   ▼   ▼   ▼   ▼   ▼
+─────────────────────────► Time
+
+Actual with jitter:
+  │ │    │  │   │    │
+  ▼ ▼    ▼  ▼   ▼    ▼
+─────────────────────────► Time
+  └─┘ ← Jitter
+</pre></div>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Measuring jitter</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">periodic_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">min_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UINT32_MAX</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">max_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">actual_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">last_wake</span><span class="p">;</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">actual_period</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">min_period</span><span class="p">)</span><span class="w"> </span><span class="n">min_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">actual_period</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">actual_period</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_period</span><span class="p">)</span><span class="w"> </span><span class="n">max_period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">actual_period</span><span class="p">;</span>
+
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">jitter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">max_period</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">min_period</span><span class="p">;</span>
+
+<span class="w">        </span><span class="c1">// Do work</span>
+<span class="w">        </span><span class="n">perform_task</span><span class="p">();</span>
+
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">period</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="measuring-execution-time">
+<h2>Measuring Execution Time<a class="headerlink" href="#measuring-execution-time" title="Link to this heading">¶</a></h2>
+<section id="hardware-timers">
+<h3>Hardware Timers<a class="headerlink" href="#hardware-timers" title="Link to this heading">¶</a></h3>
+<p><strong>Cycle Counter (ARM Cortex-M):</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Enable DWT cycle counter (Cortex-M3/M4/M7)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">enable_cycle_counter</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">CoreDebug</span><span class="o">-&gt;</span><span class="n">DEMCR</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">CoreDebug_DEMCR_TRCENA_Msk</span><span class="p">;</span>
+<span class="w">    </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CTRL</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">DWT_CTRL_CYCCNTENA_Msk</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Measure execution time</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="nf">measure_function_time</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">function_under_test</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cycles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Convert to microseconds (assuming 168 MHz)</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">microseconds</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cycles</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">168</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">microseconds</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>System Timer:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Using SysTick or hardware timer</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">start_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="n">perform_operation</span><span class="p">();</span>
+
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">end_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">elapsed_ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">end_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start_time</span><span class="p">;</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">elapsed_ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">elapsed_ticks</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">portTICK_PERIOD_MS</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+<section id="gpio-toggle-method">
+<h3>GPIO Toggle Method<a class="headerlink" href="#gpio-toggle-method" title="Link to this heading">¶</a></h3>
+<p>Simple but effective for oscilloscope measurement:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">measured_function</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">DEBUG_PIN</span><span class="p">);</span><span class="w">    </span><span class="c1">// Set pin HIGH at start</span>
+
+<span class="w">    </span><span class="c1">// Function body</span>
+<span class="w">    </span><span class="n">do_complex_computation</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">GPIO_CLEAR</span><span class="p">(</span><span class="n">DEBUG_PIN</span><span class="p">);</span><span class="w">  </span><span class="c1">// Set pin LOW at end</span>
+<span class="p">}</span>
+
+<span class="c1">// Measure pulse width with oscilloscope or logic analyzer</span>
+<span class="c1">// Directly see execution time and jitter</span>
+</pre></div>
+</div>
+</section>
+<section id="multiple-points">
+<h3>Multiple Points<a class="headerlink" href="#multiple-points" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Instrument multiple points</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">complex_task</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">PIN0</span><span class="p">);</span><span class="w">        </span><span class="c1">// Overall function</span>
+
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">PIN1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">phase1_processing</span><span class="p">();</span>
+<span class="w">    </span><span class="n">GPIO_CLEAR</span><span class="p">(</span><span class="n">PIN1</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">GPIO_SET</span><span class="p">(</span><span class="n">PIN2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">phase2_processing</span><span class="p">();</span>
+<span class="w">    </span><span class="n">GPIO_CLEAR</span><span class="p">(</span><span class="n">PIN2</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">GPIO_CLEAR</span><span class="p">(</span><span class="n">PIN0</span><span class="p">);</span><span class="w">      </span><span class="c1">// Overall function end</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="statistical-measurement">
+<h3>Statistical Measurement<a class="headerlink" href="#statistical-measurement" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define NUM_SAMPLES 1000</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">min</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">max</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sum</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">count</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">timing_stats_t</span><span class="p">;</span>
+
+<span class="n">timing_stats_t</span><span class="w"> </span><span class="n">stats</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UINT32_MAX</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="p">.</span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">update_timing_stats</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sample</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sample</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">min</span><span class="p">)</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sample</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">sample</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">max</span><span class="p">)</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sample</span><span class="p">;</span>
+<span class="w">    </span><span class="n">stats</span><span class="p">.</span><span class="n">sum</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">sample</span><span class="p">;</span>
+<span class="w">    </span><span class="n">stats</span><span class="p">.</span><span class="n">count</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">measure_task_timing</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">task_function</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cycles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+<span class="w">    </span><span class="n">update_timing_stats</span><span class="p">(</span><span class="n">cycles</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">stats</span><span class="p">.</span><span class="n">count</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">NUM_SAMPLES</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">avg</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">sum</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">count</span><span class="p">;</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Min: %u, Max: %u, Avg: %u cycles</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">stats</span><span class="p">.</span><span class="n">min</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">stats</span><span class="p">.</span><span class="n">max</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">avg</span><span class="p">);</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Jitter: %u cycles</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)(</span><span class="n">stats</span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">stats</span><span class="p">.</span><span class="n">min</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="schedulability-analysis">
+<h2>Schedulability Analysis<a class="headerlink" href="#schedulability-analysis" title="Link to this heading">¶</a></h2>
+<section id="rate-monotonic-analysis-rma">
+<h3>Rate Monotonic Analysis (RMA)<a class="headerlink" href="#rate-monotonic-analysis-rma" title="Link to this heading">¶</a></h3>
+<p>For periodic tasks with deadline = period:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">period_ms</span><span class="p">;</span><span class="w">      </span><span class="c1">// T</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">wcet_ms</span><span class="p">;</span><span class="w">        </span><span class="c1">// C</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">priority</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">task_info_t</span><span class="p">;</span>
+
+<span class="n">task_info_t</span><span class="w"> </span><span class="n">tasks</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="s">&quot;Fast&quot;</span><span class="p">,</span><span class="w">   </span><span class="mi">10</span><span class="p">,</span><span class="w">  </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">},</span><span class="w">   </span><span class="c1">// C=3ms, T=10ms, U=0.30</span>
+<span class="w">    </span><span class="p">{</span><span class="s">&quot;Medium&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w">  </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">},</span><span class="w">   </span><span class="c1">// C=5ms, T=20ms, U=0.25</span>
+<span class="w">    </span><span class="p">{</span><span class="s">&quot;Slow&quot;</span><span class="p">,</span><span class="w">   </span><span class="mi">50</span><span class="p">,</span><span class="w">  </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">},</span><span class="w">   </span><span class="c1">// C=8ms, T=50ms, U=0.16</span>
+<span class="p">};</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">check_rma_schedulability</span><span class="p">(</span><span class="n">task_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">tasks</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Calculate total utilization</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">U</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">U</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="p">(</span><span class="kt">float</span><span class="p">)</span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">wcet_ms</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">period_ms</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Liu &amp; Layland bound</span>
+<span class="w">    </span><span class="kt">float</span><span class="w"> </span><span class="n">bound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="p">(</span><span class="n">powf</span><span class="p">(</span><span class="mf">2.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0f</span><span class="o">/</span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Utilization: %.2f%%</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">U</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;RMA bound: %.2f%%</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">bound</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">U</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">bound</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Schedulable by RMA</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">U</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mf">1.0f</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;May be schedulable (requires exact analysis)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w">  </span><span class="c1">// Needs further analysis</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;NOT schedulable (overload)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="response-time-analysis">
+<h3>Response Time Analysis<a class="headerlink" href="#response-time-analysis" title="Link to this heading">¶</a></h3>
+<p>More precise than RMA utilization bound:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Calculate worst-case response time for task i</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="nf">calculate_response_time</span><span class="p">(</span><span class="n">task_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">tasks</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">wcet_ms</span><span class="p">;</span><span class="w">  </span><span class="c1">// Start with WCET</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">R_prev</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">R_prev</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">R</span><span class="p">;</span>
+<span class="w">        </span><span class="n">R</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">wcet_ms</span><span class="p">;</span><span class="w">  </span><span class="c1">// Execution time</span>
+
+<span class="w">        </span><span class="c1">// Add interference from higher-priority tasks</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">tasks</span><span class="p">[</span><span class="n">j</span><span class="p">].</span><span class="n">priority</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">priority</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Number of preemptions from task j</span>
+<span class="w">                </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">preemptions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">R_prev</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">j</span><span class="p">].</span><span class="n">period_ms</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">                                     </span><span class="o">/</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">j</span><span class="p">].</span><span class="n">period_ms</span><span class="p">;</span>
+<span class="w">                </span><span class="n">R</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">preemptions</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">j</span><span class="p">].</span><span class="n">wcet_ms</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">R</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">R_prev</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">period_ms</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">R</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">analyze_all_tasks</span><span class="p">(</span><span class="n">task_info_t</span><span class="w"> </span><span class="o">*</span><span class="n">tasks</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Response Time Analysis:</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">all_schedulable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calculate_response_time</span><span class="p">(</span><span class="n">tasks</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;%s: WCET=%ums, Period=%ums, Response=%ums&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">wcet_ms</span><span class="p">,</span>
+<span class="w">               </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">period_ms</span><span class="p">,</span><span class="w"> </span><span class="n">R</span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">R</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">tasks</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">period_ms</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot; [OK]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot; [DEADLINE MISS]</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">            </span><span class="n">all_schedulable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">System %sschedulable</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">all_schedulable</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s">&quot;NOT &quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="runtime-monitoring">
+<h2>Runtime Monitoring<a class="headerlink" href="#runtime-monitoring" title="Link to this heading">¶</a></h2>
+<section id="deadline-miss-detection">
+<h3>Deadline Miss Detection<a class="headerlink" href="#deadline-miss-detection" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">release_time</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">deadline</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">miss_count</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">task_deadline_t</span><span class="p">;</span>
+
+<span class="n">task_deadline_t</span><span class="w"> </span><span class="n">task_dl</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">deadline_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">period</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">deadline_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">period</span><span class="p">;</span><span class="w">  </span><span class="c1">// Deadline = period</span>
+
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_wake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">task_dl</span><span class="p">.</span><span class="n">release_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">        </span><span class="n">task_dl</span><span class="p">.</span><span class="n">deadline</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">task_dl</span><span class="p">.</span><span class="n">release_time</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">deadline_offset</span><span class="p">;</span>
+
+<span class="w">        </span><span class="c1">// Do work</span>
+<span class="w">        </span><span class="n">perform_task_work</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Check if deadline met</span>
+<span class="w">        </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">completion_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">completion_time</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">task_dl</span><span class="p">.</span><span class="n">deadline</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">task_dl</span><span class="p">.</span><span class="n">miss_count</span><span class="o">++</span><span class="p">;</span>
+<span class="w">            </span><span class="c1">// Log deadline miss</span>
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Deadline miss #%u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">task_dl</span><span class="p">.</span><span class="n">miss_count</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="n">vTaskDelayUntil</span><span class="p">(</span><span class="o">&amp;</span><span class="n">last_wake</span><span class="p">,</span><span class="w"> </span><span class="n">period</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="cpu-load-monitoring">
+<h3>CPU Load Monitoring<a class="headerlink" href="#cpu-load-monitoring" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS runtime stats</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">print_task_stats</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TaskStatus_t</span><span class="w"> </span><span class="o">*</span><span class="n">task_array</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">total_runtime</span><span class="p">;</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">task_count</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Get task count</span>
+<span class="w">    </span><span class="n">task_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uxTaskGetNumberOfTasks</span><span class="p">();</span>
+<span class="w">    </span><span class="n">task_array</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pvPortMalloc</span><span class="p">(</span><span class="n">task_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">TaskStatus_t</span><span class="p">));</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">task_array</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Get task stats</span>
+<span class="w">        </span><span class="n">task_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uxTaskGetSystemState</span><span class="p">(</span><span class="n">task_array</span><span class="p">,</span>
+<span class="w">                                         </span><span class="n">task_count</span><span class="p">,</span>
+<span class="w">                                         </span><span class="o">&amp;</span><span class="n">total_runtime</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Calculate percentage</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Task CPU Usage:</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">task_count</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">percentage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">task_array</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">ulRunTimeCounter</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="p">)</span>
+<span class="w">                                </span><span class="o">/</span><span class="w"> </span><span class="n">total_runtime</span><span class="p">;</span>
+
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;%s: %u%%</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                   </span><span class="n">task_array</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">pcTaskName</span><span class="p">,</span>
+<span class="w">                   </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">percentage</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="n">vPortFree</span><span class="p">(</span><span class="n">task_array</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="idle-time-measurement">
+<h3>Idle Time Measurement<a class="headerlink" href="#idle-time-measurement" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">volatile</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">idle_counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">vApplicationIdleHook</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">idle_counter</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">calculate_cpu_usage</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">last_idle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">last_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">current_idle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">idle_counter</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">current_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">idle_delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_idle</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">last_idle</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">time_delta</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_time</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">last_time</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Assume idle loop runs N iterations per ms (calibrated)</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">idle_time_ms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">idle_delta</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">IDLE_LOOPS_PER_MS</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cpu_usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">(</span><span class="n">idle_time_ms</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">time_delta</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;CPU Usage: %u%%</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cpu_usage</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">last_idle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_idle</span><span class="p">;</span>
+<span class="w">    </span><span class="n">last_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current_time</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="trace-analysis-tools">
+<h2>Trace Analysis Tools<a class="headerlink" href="#trace-analysis-tools" title="Link to this heading">¶</a></h2>
+<section id="rtos-trace">
+<h3>RTOS Trace<a class="headerlink" href="#rtos-trace" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS trace hooks (tracealyzer, SystemView, etc.)</span>
+<span class="cp">#define traceTASK_SWITCHED_IN()  \</span>
+<span class="cp">    record_task_switch_in(pxCurrentTCB)</span>
+
+<span class="cp">#define traceTASK_SWITCHED_OUT() \</span>
+<span class="cp">    record_task_switch_out(pxCurrentTCB)</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">record_task_switch_in</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">task</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Log task switch for offline analysis</span>
+<span class="w">    </span><span class="n">trace_buffer</span><span class="p">[</span><span class="n">trace_idx</span><span class="p">].</span><span class="n">task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">task</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trace_buffer</span><span class="p">[</span><span class="n">trace_idx</span><span class="p">].</span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trace_buffer</span><span class="p">[</span><span class="n">trace_idx</span><span class="p">].</span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EVENT_TASK_IN</span><span class="p">;</span>
+<span class="w">    </span><span class="n">trace_idx</span><span class="o">++</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="segment-tracing">
+<h3>Segment Tracing<a class="headerlink" href="#segment-tracing" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Instrumentation for detailed analysis</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">instrumented_function</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">TRACE_BEGIN</span><span class="p">(</span><span class="n">FUNC_ID</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">complex_operation</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">TRACE_END</span><span class="p">(</span><span class="n">FUNC_ID</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cp">#define TRACE_BEGIN(id) \</span>
+<span class="cp">    do { \</span>
+<span class="cp">        trace_event(TRACE_ENTER, id, DWT-&gt;CYCCNT); \</span>
+<span class="cp">    } while(0)</span>
+
+<span class="cp">#define TRACE_END(id) \</span>
+<span class="cp">    do { \</span>
+<span class="cp">        trace_event(TRACE_EXIT, id, DWT-&gt;CYCCNT); \</span>
+<span class="cp">    } while(0)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="timing-optimization">
+<h2>Timing Optimization<a class="headerlink" href="#timing-optimization" title="Link to this heading">¶</a></h2>
+<section id="code-optimization">
+<h3>Code Optimization<a class="headerlink" href="#code-optimization" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Before: Inefficient</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">slow_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">result</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">sqrt</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span><span class="w">  </span><span class="c1">// Floating point in loop</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// After: Optimized</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">fast_version</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Use lookup table</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">result</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">sqrt_table</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">]];</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="cache-optimization">
+<h3>Cache Optimization<a class="headerlink" href="#cache-optimization" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Align critical data structures to cache line</span>
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">aligned</span><span class="p">(</span><span class="mi">32</span><span class="p">)))</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">data</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+<span class="p">}</span><span class="w"> </span><span class="n">cache_aligned_struct_t</span><span class="p">;</span>
+
+<span class="c1">// Place hot code in fast memory (ITCM on Cortex-M7)</span>
+<span class="n">__attribute__</span><span class="p">((</span><span class="n">section</span><span class="p">(</span><span class="s">&quot;.itcm&quot;</span><span class="p">)))</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">time_critical_function</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Executes from fast instruction memory</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="reducing-preemption">
+<h3>Reducing Preemption<a class="headerlink" href="#reducing-preemption" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Critical section for very short duration</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">atomic_update</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Quick operation (&lt; 10 µs)</span>
+<span class="w">    </span><span class="n">shared_data</span><span class="o">++</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="benchmarking">
+<h2>Benchmarking<a class="headerlink" href="#benchmarking" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Benchmark suite</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">function</span><span class="p">)(</span><span class="kt">void</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">iterations</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">benchmark_t</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">run_benchmark</span><span class="p">(</span><span class="n">benchmark_t</span><span class="w"> </span><span class="o">*</span><span class="n">bench</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">bench</span><span class="o">-&gt;</span><span class="n">iterations</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">bench</span><span class="o">-&gt;</span><span class="n">function</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DWT</span><span class="o">-&gt;</span><span class="n">CYCCNT</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">total_cycles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cycles_per_call</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">total_cycles</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">bench</span><span class="o">-&gt;</span><span class="n">iterations</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;%s: %u cycles/call (%u iterations)</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="n">bench</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cycles_per_call</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">bench</span><span class="o">-&gt;</span><span class="n">iterations</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Measure, don’t guess</strong>: Use actual measurements, not assumptions</p></li>
+<li><p><strong>Test worst-case scenarios</strong>: Maximum load, all interrupts, cache misses</p></li>
+<li><p><strong>Add timing margin</strong>: Design for 70-80% utilization, not 100%</p></li>
+<li><p><strong>Monitor in production</strong>: Detect timing violations early</p></li>
+<li><p><strong>Document timing requirements</strong>: Make deadlines explicit</p></li>
+<li><p><strong>Use static analysis tools</strong>: Complement measurements</p></li>
+<li><p><strong>Validate on target hardware</strong>: Timing varies between platforms</p></li>
+<li><p><strong>Test over temperature range</strong>: Performance can degrade with temperature</p></li>
+</ol>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Testing only typical case</strong>: Missing worst-case scenarios</p></li>
+<li><p><strong>Ignoring interrupts</strong>: They affect execution time</p></li>
+<li><p><strong>Cache effects</strong>: Timing varies with cache state</p></li>
+<li><p><strong>Compiler optimization</strong>: Release vs debug builds differ significantly</p></li>
+<li><p><strong>Insufficient samples</strong>: Need many measurements for statistical confidence</p></li>
+</ol>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day09.html"><span class="doc">Day 09 - Latency, Jitter, and Timing Analysis</span></a> - Latency, Jitter, and Timing Analysis</p></li>
+<li><p><a class="reference internal" href="scheduling.html"><span class="doc">Scheduling Algorithms</span></a> - Schedulability theory</p></li>
+<li><p><a class="reference internal" href="interrupts.html"><span class="doc">Interrupt Handling</span></a> - Interrupt latency</p></li>
+<li><p><a class="reference internal" href="rtos_basics.html"><span class="doc">RTOS Basics</span></a> - Task concepts</p></li>
+<li><p><a class="reference internal" href="../comparison/rtos_selection_guide.html"><span class="doc">RTOS Selection Guide</span></a> - Performance comparison</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“Real-Time Systems” by Jane W.S. Liu</p></li>
+<li><p>“Hard Real-Time Computing Systems” by Giorgio Buttazzo</p></li>
+<li><p>WCET analysis tools documentation (aiT, RapiTime)</p></li>
+<li><p>ARM Cycle Counter documentation</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/overview/timing_analysis.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

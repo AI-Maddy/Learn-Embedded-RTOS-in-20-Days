@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Day 08 - Memory and Stack Management &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Day 09 - Latency, Jitter, and Timing Analysis" href="day09.html" />
+    <link rel="prev" title="Day 07 - Interrupt Handling with RTOS" href="day07.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="day-08-memory-and-stack-management">
+<h1>Day 08 - Memory and Stack Management<a class="headerlink" href="#day-08-memory-and-stack-management" title="Link to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="id1">
+<h1>Day 08 - Memory and Stack Management<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<section id="focus">
+<h2>Focus<a class="headerlink" href="#focus" title="Link to this heading">¶</a></h2>
+<p>This day concentrates on allocation strategy, stack sizing, and failure guards.</p>
+</section>
+<section id="learning-objectives">
+<h2>Learning Objectives<a class="headerlink" href="#learning-objectives" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Understand the core concept and where it appears in embedded products.</p></li>
+<li><p>Build or reason about one practical implementation pattern.</p></li>
+<li><p>Identify failure modes and prevention checks for production firmware.</p></li>
+</ul>
+</section>
+<section id="deliverables">
+<h2>Deliverables<a class="headerlink" href="#deliverables" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Concept notes in <code class="docutils literal notranslate"><span class="pre">lesson.rst</span></code>.</p></li>
+<li><p>Practice problems in <code class="docutils literal notranslate"><span class="pre">exercises.rst</span></code>.</p></li>
+<li><p>Guided answer strategy in <code class="docutils literal notranslate"><span class="pre">solutions.rst</span></code>.</p></li>
+</ul>
+</section>
+<section id="definition-of-done">
+<h2>Definition of Done<a class="headerlink" href="#definition-of-done" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>You can explain the concept without notes.</p></li>
+<li><p>You can map the concept to at least one real product scenario.</p></li>
+<li><p>You can list at least three verification checks for correctness.</p></li>
+</ul>
+</section>
+<section id="lesson">
+<h2>Lesson<a class="headerlink" href="#lesson" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-08-lesson-memory-and-stack-management">
+<h1>Day 08 Lesson - Memory and Stack Management<a class="headerlink" href="#day-08-lesson-memory-and-stack-management" title="Link to this heading">¶</a></h1>
+<p>Stack management, heap allocation, and memory pools are critical for reliable embedded systems. This lesson covers sizing, monitoring, and debugging memory issues.</p>
+<p>Key Topics:
+- Stack sizing and overflow detection
+- Heap allocation schemes (heap_1 through heap_5)
+- Memory pools for predictable allocation
+- Fragmentation prevention
+- Memory debugging tools</p>
+<section id="exercises">
+<h2>Exercises<a class="headerlink" href="#exercises" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-08-exercises-memory-and-stack-management">
+<h1>Day 08 Exercises - Memory and Stack Management<a class="headerlink" href="#day-08-exercises-memory-and-stack-management" title="Link to this heading">¶</a></h1>
+<p>Exercise 1: Stack usage analysis and sizing for multi-task system.
+Exercise 2: Compare heap schemes and measure fragmentation.
+Exercise 3: Implement fixed-size memory pool for zero-fragmentation allocation.</p>
+<section id="solutions">
+<h2>Solutions<a class="headerlink" href="#solutions" title="Link to this heading">¶</a></h2>
+</section>
+</section>
+<section id="day-08-solutions-memory-and-stack-management">
+<h1>Day 08 Solutions - Memory and Stack Management<a class="headerlink" href="#day-08-solutions-memory-and-stack-management" title="Link to this heading">¶</a></h1>
+<p>Complete memory management implementations with leak detection, fragmentation analysis, and optimization strategies.</p>
+<section id="navigation">
+<h2>Navigation<a class="headerlink" href="#navigation" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="day07.html"><span class="doc">Previous (07)</span></a></p></li>
+<li><p><a class="reference internal" href="day09.html"><span class="doc">Next (09)</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Daily Learning Path</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="day01.html">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#id1">Day 01 - Intro to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-lesson-introduction-to-real-time-operating-systems">Day 01 Lesson - Introduction to Real-Time Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-exercises-introduction-to-rtos">Day 01 Exercises - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day01.html#day-01-solutions-introduction-to-rtos">Day 01 Solutions - Introduction to RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#id1">Day 02 - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-lesson-tasks-and-threads">Day 02 Lesson - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-exercises-tasks-and-threads">Day 02 Exercises - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day02.html#day-02-solutions-tasks-and-threads">Day 02 Solutions - Tasks and Threads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#id1">Day 03 - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-lesson-scheduling-and-determinism">Day 03 Lesson - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-exercises-scheduling-and-determinism">Day 03 Exercises - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day03.html#day-03-solutions-scheduling-and-determinism">Day 03 Solutions - Scheduling and Determinism</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#id1">Day 04 - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-lesson-context-switching">Day 04 Lesson - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-exercises-context-switching">Day 04 Exercises - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day04.html#day-04-solutions-context-switching">Day 04 Solutions - Context Switching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#id1">Day 05 - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-lesson-semaphores-and-mutexes">Day 05 Lesson - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-exercises-semaphores-and-mutexes">Day 05 Exercises - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day05.html#day-05-solutions-semaphores-and-mutexes">Day 05 Solutions - Semaphores and Mutexes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#id1">Day 06 - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-lesson-queues-and-event-groups">Day 06 Lesson - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-exercises-queues-and-event-groups">Day 06 Exercises - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day06.html#day-06-solutions-queues-and-event-groups">Day 06 Solutions - Queues and Event Groups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#id1">Day 07 - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-lesson-interrupt-handling-with-rtos">Day 07 Lesson - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-exercises-interrupt-handling-with-rtos">Day 07 Exercises - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day07.html#day-07-solutions-interrupt-handling-with-rtos">Day 07 Solutions - Interrupt Handling with RTOS</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id1">Day 08 - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-08-lesson-memory-and-stack-management">Day 08 Lesson - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-08-exercises-memory-and-stack-management">Day 08 Exercises - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#day-08-solutions-memory-and-stack-management">Day 08 Solutions - Memory and Stack Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#id1">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-lesson-latency-jitter-and-timing-analysis">Day 09 Lesson - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-exercises-latency-jitter-and-timing-analysis">Day 09 Exercises - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day09.html#day-09-solutions-latency-jitter-and-timing-analysis">Day 09 Solutions - Latency, Jitter, and Timing Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#id1">Day 10 - Build Systems, Ports, and Board Bring-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-lesson-build-systems-ports-and-board-bringup">Day 10 Lesson - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-exercises-build-systems-ports-and-board-bringup">Day 10 Exercises - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day10.html#day-10-solutions-build-systems-ports-and-board-bringup">Day 10 Solutions - Build Systems, Ports, and Board Bringup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#id1">Day 11 - FreeRTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-lesson-freertos-deep-dive">Day 11 Lesson - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-exercises-freertos-deep-dive">Day 11 Exercises - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day11.html#day-11-solutions-freertos-deep-dive">Day 11 Solutions - FreeRTOS Deep Dive</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#id1">Day 12 - Zephyr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-lesson-zephyr-rtos">Day 12 Lesson - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-exercises-zephyr-rtos">Day 12 Exercises - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day12.html#day-12-solutions-zephyr-rtos">Day 12 Solutions - Zephyr RTOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#id1">Day 13 - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-lesson-chibios">Day 13 Lesson - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-exercises-chibios">Day 13 Exercises - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day13.html#day-13-solutions-chibios">Day 13 Solutions - ChibiOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#id1">Day 14 - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-lesson-threadx-azure-rtos">Day 14 Lesson - ThreadX (Azure RTOS)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-exercises-threadx">Day 14 Exercises - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day14.html#day-14-solutions-threadx">Day 14 Solutions - ThreadX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day15.html#id1">Day 15 - embOS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day16.html#id1">Day 16 - NuttX</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day17.html#id1">Day 17 - PX5</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day18.html#id1">Day 18 - eCos</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#id1">Day 19 - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-lesson-rtos-comparison-and-selection">Day 19 Lesson - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-exercises-rtos-comparison-and-selection">Day 19 Exercises - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day19.html#day-19-solutions-rtos-comparison-and-selection">Day 19 Solutions - RTOS Comparison and Selection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#id1">Day 20 - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-lesson-final-project">Day 20 Lesson - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-exercises-final-project">Day 20 Exercises - Final Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="day20.html#day-20-solutions-final-project">Day 20 Solutions - Final Project</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Daily Learning Path</a><ul>
+      <li>Previous: <a href="day07.html" title="previous chapter">Day 07 - Interrupt Handling with RTOS</a></li>
+      <li>Next: <a href="day09.html" title="next chapter">Day 09 - Latency, Jitter, and Timing Analysis</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/days/day08.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

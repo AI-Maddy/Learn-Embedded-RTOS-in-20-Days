@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Command Dispatcher &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="command-dispatcher">
+<h1>Command Dispatcher<a class="headerlink" href="#command-dispatcher" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p>The <strong>command dispatcher pattern</strong> serializes command execution through a centralized processing task. Commands are queued from multiple sources (user input, network, other tasks) and executed sequentially in a controlled manner.</p>
+<p><strong>Benefits:</strong>
+- Centralized command processing
+- Serialized execution (no race conditions)
+- Priority-based command handling
+- Easy command logging and debugging
+- Undo/redo capability</p>
+</section>
+<section id="pattern-overview">
+<h2>Pattern Overview<a class="headerlink" href="#pattern-overview" title="Link to this heading">¶</a></h2>
+<section id="architecture">
+<h3>Architecture<a class="headerlink" href="#architecture" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Source 1 ──┐
+           ├──► Command    ──► Dispatcher ──► Execute
+Source 2 ──┤      Queue          Task           Commands
+           │
+Source 3 ──┘
+</pre></div>
+</div>
+<p><strong>Components:</strong>
+- <strong>Command Queue</strong>: Holds pending commands
+- <strong>Dispatcher Task</strong>: Processes commands sequentially
+- <strong>Command Handlers</strong>: Execute specific commands
+- <strong>Result Queue</strong> (optional): Return command results</p>
+</section>
+</section>
+<section id="basic-implementation">
+<h2>Basic Implementation<a class="headerlink" href="#basic-implementation" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;FreeRTOS.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;task.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;queue.h&quot;</span>
+
+<span class="c1">// Command types</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">CMD_LED_ON</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_LED_OFF</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_SET_SPEED</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_READ_SENSOR</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_RESET_SYSTEM</span>
+<span class="p">}</span><span class="w"> </span><span class="n">command_type_t</span><span class="p">;</span>
+
+<span class="c1">// Command structure</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_type_t</span><span class="w"> </span><span class="n">type</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param1</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param2</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">response_task</span><span class="p">;</span><span class="w">  </span><span class="c1">// For async responses</span>
+<span class="p">}</span><span class="w"> </span><span class="n">command_t</span><span class="p">;</span>
+
+<span class="c1">// Command queue</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">command_queue</span><span class="p">;</span>
+<span class="cp">#define COMMAND_QUEUE_LENGTH 20</span>
+
+<span class="c1">// Command dispatcher task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">command_dispatcher_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for command</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">command_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Dispatch based on command type</span>
+<span class="w">            </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">CMD_LED_ON</span><span class="p">:</span>
+<span class="w">                    </span><span class="n">led_set</span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">CMD_LED_OFF</span><span class="p">:</span>
+<span class="w">                    </span><span class="n">led_set</span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">CMD_SET_SPEED</span><span class="p">:</span>
+<span class="w">                    </span><span class="n">motor_set_speed</span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">CMD_READ_SENSOR</span><span class="p">:</span>
+<span class="w">                    </span><span class="p">{</span>
+<span class="w">                        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sensor_read</span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">                        </span><span class="c1">// Send result if response task specified</span>
+<span class="w">                        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">response_task</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                            </span><span class="n">xTaskNotify</span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">response_task</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">eSetValueWithOverwrite</span><span class="p">);</span>
+<span class="w">                        </span><span class="p">}</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="no">CMD_RESET_SYSTEM</span><span class="p">:</span>
+<span class="w">                    </span><span class="n">system_reset</span><span class="p">();</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+
+<span class="w">                </span><span class="k">default</span><span class="o">:</span>
+<span class="w">                    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Unknown command: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">break</span><span class="p">;</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Command submission function</span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">submit_command</span><span class="p">(</span><span class="n">command_type_t</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">type</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">param1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">param1</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">param2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">param2</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span>
+<span class="w">        </span><span class="p">.</span><span class="n">response_task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span>
+<span class="w">    </span><span class="p">};</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">command_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Initialization</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">init_command_dispatcher</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="n">COMMAND_QUEUE_LENGTH</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_t</span><span class="p">));</span>
+<span class="w">    </span><span class="n">xTaskCreate</span><span class="p">(</span><span class="n">command_dispatcher_task</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;CmdDispatch&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">512</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="function-pointer-based-dispatcher">
+<h2>Function Pointer-Based Dispatcher<a class="headerlink" href="#function-pointer-based-dispatcher" title="Link to this heading">¶</a></h2>
+<p>More extensible and maintainable:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Command handler function type</span>
+<span class="k">typedef</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">command_handler_t</span><span class="p">)(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">);</span>
+
+<span class="c1">// Command handler implementations</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_led_on</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;LED %u ON</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">led_set</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_led_off</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;LED %u OFF</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">led_set</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_set_speed</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Motor speed: %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">motor_set_speed</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_read_sensor</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sensor_read</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Sensor %u: %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">value</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">response_task</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">xTaskNotify</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">response_task</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">eSetValueWithOverwrite</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_reset</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;System reset</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">system_reset</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Command handler table</span>
+<span class="n">command_handler_t</span><span class="w"> </span><span class="n">command_handlers</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_LED_ON</span><span class="p">]</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">handle_led_on</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_LED_OFF</span><span class="p">]</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="n">handle_led_off</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_SET_SPEED</span><span class="p">]</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">handle_set_speed</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_READ_SENSOR</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle_read_sensor</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_RESET_SYSTEM</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle_reset</span>
+<span class="p">};</span>
+
+<span class="c1">// Improved dispatcher</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">command_dispatcher_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">command_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Validate command type</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_handlers</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_handler_t</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">command_handlers</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="c1">// Execute handler</span>
+<span class="w">                    </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">);</span>
+<span class="w">                </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;No handler for command %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">);</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Invalid command type: %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-based-command-handling">
+<h2>Priority-Based Command Handling<a class="headerlink" href="#priority-based-command-handling" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">CMD_PRIORITY_LOW</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_PRIORITY_NORMAL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_PRIORITY_HIGH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="n">CMD_PRIORITY_CRITICAL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span>
+<span class="p">}</span><span class="w"> </span><span class="n">command_priority_t</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">command</span><span class="p">;</span>
+<span class="w">    </span><span class="n">command_priority_t</span><span class="w"> </span><span class="n">priority</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">sequence_number</span><span class="p">;</span><span class="w">  </span><span class="c1">// For ordering within same priority</span>
+<span class="p">}</span><span class="w"> </span><span class="n">prioritized_command_t</span><span class="p">;</span>
+
+<span class="c1">// Separate queues for each priority</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">priority_queues</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">init_priority_dispatcher</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">priority_queues</span><span class="p">[</span><span class="n">CMD_PRIORITY_LOW</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_t</span><span class="p">));</span>
+<span class="w">    </span><span class="n">priority_queues</span><span class="p">[</span><span class="n">CMD_PRIORITY_NORMAL</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_t</span><span class="p">));</span>
+<span class="w">    </span><span class="n">priority_queues</span><span class="p">[</span><span class="n">CMD_PRIORITY_HIGH</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_t</span><span class="p">));</span>
+<span class="w">    </span><span class="n">priority_queues</span><span class="p">[</span><span class="n">CMD_PRIORITY_CRITICAL</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_t</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">submit_priority_command</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">command_priority_t</span><span class="w"> </span><span class="n">priority</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">priority_queues</span><span class="p">[</span><span class="n">priority</span><span class="p">],</span><span class="w"> </span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">priority_dispatcher_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Check queues from highest to lowest priority</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">pri</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CMD_PRIORITY_CRITICAL</span><span class="p">;</span><span class="w"> </span><span class="n">pri</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">CMD_PRIORITY_LOW</span><span class="p">;</span><span class="w"> </span><span class="n">pri</span><span class="o">--</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">priority_queues</span><span class="p">[</span><span class="n">pri</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Process command</span>
+<span class="w">                </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">);</span>
+<span class="w">                </span><span class="k">break</span><span class="p">;</span><span class="w">  </span><span class="c1">// Check from top again after processing</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="c1">// If no commands, block on normal priority queue</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">priority_queues</span><span class="p">[</span><span class="n">CMD_PRIORITY_NORMAL</span><span class="p">],</span>
+<span class="w">                         </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="synchronous-command-execution">
+<h2>Synchronous Command Execution<a class="headerlink" href="#synchronous-command-execution" title="Link to this heading">¶</a></h2>
+<p>Wait for command completion:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">command</span><span class="p">;</span>
+<span class="w">    </span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">completion_sem</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">sync_command_t</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">execute_command_sync</span><span class="p">(</span><span class="n">command_type_t</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">sync_command_t</span><span class="w"> </span><span class="n">sync_cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">command</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">type</span><span class="p">;</span>
+<span class="w">    </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">command</span><span class="p">.</span><span class="n">param1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">param1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">command</span><span class="p">.</span><span class="n">param2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">param2</span><span class="p">;</span>
+<span class="w">    </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">completion_sem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateBinary</span><span class="p">();</span>
+<span class="w">    </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Submit command</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">command_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">command</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for completion</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">completion_sem</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">5000</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">result</span><span class="p">;</span>
+<span class="w">            </span><span class="n">vSemaphoreDelete</span><span class="p">(</span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">completion_sem</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Timeout</span>
+<span class="w">            </span><span class="n">vSemaphoreDelete</span><span class="p">(</span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">completion_sem</span><span class="p">);</span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">vSemaphoreDelete</span><span class="p">(</span><span class="n">sync_cmd</span><span class="p">.</span><span class="n">completion_sem</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Modified handler</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">handle_read_sensor_sync</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">sync_command_t</span><span class="w"> </span><span class="o">*</span><span class="n">sync_cmd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">sync_command_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="n">cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sensor_read</span><span class="p">(</span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">sync_cmd</span><span class="o">-&gt;</span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Signal completion</span>
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">sync_cmd</span><span class="o">-&gt;</span><span class="n">completion_sem</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="command-history-and-logging">
+<h2>Command History and Logging<a class="headerlink" href="#command-history-and-logging" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define HISTORY_SIZE 100</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">command</span><span class="p">;</span>
+<span class="w">    </span><span class="n">TickType_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">execution_time_us</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">command_history_entry_t</span><span class="p">;</span>
+
+<span class="n">command_history_entry_t</span><span class="w"> </span><span class="n">command_history</span><span class="p">[</span><span class="n">HISTORY_SIZE</span><span class="p">];</span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">history_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">history_mutex</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">log_command</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">execution_time_us</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">history_mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">command_history</span><span class="p">[</span><span class="n">history_index</span><span class="p">].</span><span class="n">command</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">;</span>
+<span class="w">    </span><span class="n">command_history</span><span class="p">[</span><span class="n">history_index</span><span class="p">].</span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+<span class="w">    </span><span class="n">command_history</span><span class="p">[</span><span class="n">history_index</span><span class="p">].</span><span class="n">execution_time_us</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">execution_time_us</span><span class="p">;</span>
+<span class="w">    </span><span class="n">command_history</span><span class="p">[</span><span class="n">history_index</span><span class="p">].</span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">history_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">history_index</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">HISTORY_SIZE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">history_mutex</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">print_command_history</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">history_mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">=== Command History ===</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">HISTORY_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">history_index</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">HISTORY_SIZE</span><span class="p">;</span>
+<span class="w">        </span><span class="n">command_history_entry_t</span><span class="w"> </span><span class="o">*</span><span class="n">entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">command_history</span><span class="p">[</span><span class="n">idx</span><span class="p">];</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">timestamp</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;[%u] Type:%d Params:(%u,%u) Result:%d Time:%uus</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">                   </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">timestamp</span><span class="p">,</span>
+<span class="w">                   </span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">command</span><span class="p">.</span><span class="n">type</span><span class="p">,</span>
+<span class="w">                   </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">command</span><span class="p">.</span><span class="n">param1</span><span class="p">,</span>
+<span class="w">                   </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">command</span><span class="p">.</span><span class="n">param2</span><span class="p">,</span>
+<span class="w">                   </span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">result</span><span class="p">,</span>
+<span class="w">                   </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">entry</span><span class="o">-&gt;</span><span class="n">execution_time_us</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">history_mutex</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="command-validation">
+<h2>Command Validation<a class="headerlink" href="#command-validation" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">command_validator_t</span><span class="p">)(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">);</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">validate_led_command</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">MAX_LEDS</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">validate_motor_speed</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="n">MAX_MOTOR_SPEED</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">bool</span><span class="w"> </span><span class="nf">validate_sensor_id</span><span class="p">(</span><span class="n">command_t</span><span class="w"> </span><span class="o">*</span><span class="n">cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">cmd</span><span class="o">-&gt;</span><span class="n">param1</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NUM_SENSORS</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">command_validator_t</span><span class="w"> </span><span class="n">command_validators</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_LED_ON</span><span class="p">]</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">validate_led_command</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_LED_OFF</span><span class="p">]</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="n">validate_led_command</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_SET_SPEED</span><span class="p">]</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">validate_motor_speed</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_READ_SENSOR</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">validate_sensor_id</span><span class="p">,</span>
+<span class="w">    </span><span class="p">[</span><span class="n">CMD_RESET_SYSTEM</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="w">  </span><span class="c1">// No validation needed</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">validated_dispatcher_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">command_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Validate command</span>
+<span class="w">            </span><span class="kt">bool</span><span class="w"> </span><span class="n">valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_validators</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">command_validator_t</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">command_validators</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">command_validators</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">);</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">valid</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Execute command</span>
+<span class="w">                </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_microseconds</span><span class="p">();</span>
+<span class="w">                </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">);</span>
+<span class="w">                </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">duration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_microseconds</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">start</span><span class="p">;</span>
+
+<span class="w">                </span><span class="c1">// Log successful execution</span>
+<span class="w">                </span><span class="n">log_command</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">duration</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Command validation failed: type=%d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cmd</span><span class="p">.</span><span class="n">type</span><span class="p">);</span>
+<span class="w">                </span><span class="n">log_command</span><span class="p">(</span><span class="o">&amp;</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="undo-redo-support">
+<h2>Undo/Redo Support<a class="headerlink" href="#undo-redo-support" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">forward_command</span><span class="p">;</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">undo_command</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">undoable_command_t</span><span class="p">;</span>
+
+<span class="cp">#define UNDO_STACK_SIZE 20</span>
+<span class="n">undoable_command_t</span><span class="w"> </span><span class="n">undo_stack</span><span class="p">[</span><span class="n">UNDO_STACK_SIZE</span><span class="p">];</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">undo_stack_top</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">execute_undoable_command</span><span class="p">(</span><span class="n">undoable_command_t</span><span class="w"> </span><span class="o">*</span><span class="n">undoable_cmd</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Execute forward command</span>
+<span class="w">    </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">undoable_cmd</span><span class="o">-&gt;</span><span class="n">forward_command</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">undoable_cmd</span><span class="o">-&gt;</span><span class="n">forward_command</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Push to undo stack</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">undo_stack_top</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">UNDO_STACK_SIZE</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">undo_stack_top</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="n">undo_stack</span><span class="p">[</span><span class="n">undo_stack_top</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">undoable_cmd</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">undo_last_command</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">undo_stack_top</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">undoable_command_t</span><span class="w"> </span><span class="o">*</span><span class="n">undoable_cmd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">undo_stack</span><span class="p">[</span><span class="n">undo_stack_top</span><span class="p">];</span>
+
+<span class="w">        </span><span class="c1">// Execute undo command</span>
+<span class="w">        </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">undoable_cmd</span><span class="o">-&gt;</span><span class="n">undo_command</span><span class="p">.</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">undoable_cmd</span><span class="o">-&gt;</span><span class="n">undo_command</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">undo_stack_top</span><span class="o">--</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Nothing to undo</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Example usage</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">toggle_led_with_undo</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">led_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">undoable_command_t</span><span class="w"> </span><span class="n">undoable_cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Forward: turn LED on</span>
+<span class="w">    </span><span class="n">undoable_cmd</span><span class="p">.</span><span class="n">forward_command</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CMD_LED_ON</span><span class="p">;</span>
+<span class="w">    </span><span class="n">undoable_cmd</span><span class="p">.</span><span class="n">forward_command</span><span class="p">.</span><span class="n">param1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">led_id</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Undo: turn LED off</span>
+<span class="w">    </span><span class="n">undoable_cmd</span><span class="p">.</span><span class="n">undo_command</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CMD_LED_OFF</span><span class="p">;</span>
+<span class="w">    </span><span class="n">undoable_cmd</span><span class="p">.</span><span class="n">undo_command</span><span class="p">.</span><span class="n">param1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">led_id</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">execute_undoable_command</span><span class="p">(</span><span class="o">&amp;</span><span class="n">undoable_cmd</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="batch-command-processing">
+<h2>Batch Command Processing<a class="headerlink" href="#batch-command-processing" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">commands</span><span class="p">[</span><span class="mi">10</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">count</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">atomic</span><span class="p">;</span><span class="w">  </span><span class="c1">// All or nothing</span>
+<span class="p">}</span><span class="w"> </span><span class="n">command_batch_t</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">execute_batch</span><span class="p">(</span><span class="n">command_batch_t</span><span class="w"> </span><span class="o">*</span><span class="n">batch</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">atomic</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Validate all commands first</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">count</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">command_validators</span><span class="p">[</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">type</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">command_validators</span><span class="p">[</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Batch validation failed at command %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">i</span><span class="p">);</span>
+<span class="w">                    </span><span class="k">return</span><span class="p">;</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// Execute all commands</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">count</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">command_handlers</span><span class="p">[</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">type</span><span class="p">](</span><span class="o">&amp;</span><span class="n">batch</span><span class="o">-&gt;</span><span class="n">commands</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="remote-command-execution">
+<h2>Remote Command Execution<a class="headerlink" href="#remote-command-execution" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Network command packet</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">__attribute__</span><span class="p">((</span><span class="n">packed</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">command_type</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param1</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">param2</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">crc</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">network_command_t</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">network_rx_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">network_command_t</span><span class="w"> </span><span class="n">net_cmd</span><span class="p">;</span>
+<span class="w">    </span><span class="n">command_t</span><span class="w"> </span><span class="n">local_cmd</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Receive command from network</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">network_receive</span><span class="p">(</span><span class="o">&amp;</span><span class="n">net_cmd</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">net_cmd</span><span class="p">))</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Validate CRC</span>
+<span class="w">            </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">calculated_crc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calculate_crc</span><span class="p">(</span><span class="o">&amp;</span><span class="n">net_cmd</span><span class="p">,</span>
+<span class="w">                                                    </span><span class="k">sizeof</span><span class="p">(</span><span class="n">net_cmd</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">uint16_t</span><span class="p">));</span>
+<span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">calculated_crc</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">net_cmd</span><span class="p">.</span><span class="n">crc</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Convert to local command</span>
+<span class="w">                </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">net_cmd</span><span class="p">.</span><span class="n">command_type</span><span class="p">;</span>
+<span class="w">                </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">param1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">net_cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">;</span>
+<span class="w">                </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">param2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">net_cmd</span><span class="p">.</span><span class="n">param2</span><span class="p">;</span>
+<span class="w">                </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">response_task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetCurrentTaskHandle</span><span class="p">();</span>
+
+<span class="w">                </span><span class="c1">// Submit to command dispatcher</span>
+<span class="w">                </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">submit_command</span><span class="p">(</span><span class="n">local_cmd</span><span class="p">.</span><span class="n">type</span><span class="p">,</span><span class="w"> </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">param1</span><span class="p">,</span><span class="w"> </span><span class="n">local_cmd</span><span class="p">.</span><span class="n">param2</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                    </span><span class="c1">// Wait for response</span>
+<span class="w">                    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">result</span><span class="p">;</span>
+<span class="w">                    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xTaskNotifyWait</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mh">0xFFFFFFFF</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                        </span><span class="c1">// Send response back over network</span>
+<span class="w">                        </span><span class="n">network_send_response</span><span class="p">(</span><span class="n">result</span><span class="p">);</span>
+<span class="w">                    </span><span class="p">}</span>
+<span class="w">                </span><span class="p">}</span>
+<span class="w">            </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;CRC error in network command</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">            </span><span class="p">}</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Validate all commands</strong>: Check parameters before execution</p></li>
+<li><p><strong>Log command execution</strong>: For debugging and auditing</p></li>
+<li><p><strong>Handle errors gracefully</strong>: Don’t crash on bad commands</p></li>
+<li><p><strong>Use timeouts</strong>: Prevent indefinite blocking</p></li>
+<li><p><strong>Consider priorities</strong>: Critical commands first</p></li>
+<li><p><strong>Monitor queue depth</strong>: Detect command backlog</p></li>
+<li><p><strong>Protect command data</strong>: Use mutexes for shared state</p></li>
+<li><p><strong>Document command protocol</strong>: Especially for remote commands</p></li>
+<li><p><strong>Test edge cases</strong>: Invalid commands, queue full, timeouts</p></li>
+<li><p><strong>Measure performance</strong>: Track command execution times</p></li>
+</ol>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day06.html"><span class="doc">Day 06 - Queues and Event Groups</span></a> - Queues and Event Groups</p></li>
+<li><p><a class="reference internal" href="../overview/synchronization.html"><span class="doc">Synchronization</span></a> - Queue patterns</p></li>
+<li><p><a class="reference internal" href="producer_consumer.html"><span class="doc">Producer-Consumer</span></a> - Queue-based patterns</p></li>
+<li><p><a class="reference internal" href="state_machine_tasks.html"><span class="doc">State Machine Tasks</span></a> - State-driven command handling</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“Design Patterns” - Command Pattern (Gang of Four)</p></li>
+<li><p>“Pattern-Oriented Software Architecture” - Command Processor pattern</p></li>
+<li><p>FreeRTOS queue documentation</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../overview/README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/patterns/command_dispatcher.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

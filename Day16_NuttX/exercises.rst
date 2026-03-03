@@ -1,0 +1,1 @@
+Day 16 Exercises - NuttX\n=======================\n\nExercise 1: Port POSIX application to NuttX.\nExercise 2: Build custom file system driver.\nExercise 3: Integrate with embedded Linux-like environment.

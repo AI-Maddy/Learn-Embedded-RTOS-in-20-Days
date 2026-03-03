@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Synchronization &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="synchronization">
+<h1>Synchronization<a class="headerlink" href="#synchronization" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>Synchronization primitives</strong> coordinate access to shared resources and enable communication between tasks. They are essential for:</p>
+<ul class="simple">
+<li><p>Preventing race conditions</p></li>
+<li><p>Coordinating task execution</p></li>
+<li><p>Sharing data safely</p></li>
+<li><p>Signaling events</p></li>
+</ul>
+<p>Common synchronization mechanisms include semaphores, mutexes, queues, and event groups.</p>
+</section>
+<section id="semaphores">
+<h2>Semaphores<a class="headerlink" href="#semaphores" title="Link to this heading">¶</a></h2>
+<p>A <strong>semaphore</strong> is a signaling mechanism that controls access to resources or coordinates task execution.</p>
+<section id="binary-semaphores">
+<h3>Binary Semaphores<a class="headerlink" href="#binary-semaphores" title="Link to this heading">¶</a></h3>
+<p>A binary semaphore has two states: available (1) or unavailable (0). Used for event notification.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create binary semaphore</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">event_sem</span><span class="p">;</span>
+<span class="n">event_sem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateBinary</span><span class="p">();</span>
+
+<span class="c1">// Task waiting for event</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">consumer_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Block until signaled</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">event_sem</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">process_event</span><span class="p">();</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// ISR signals event</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">xSemaphoreGiveFromISR</span><span class="p">(</span><span class="n">event_sem</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="counting-semaphores">
+<h3>Counting Semaphores<a class="headerlink" href="#counting-semaphores" title="Link to this heading">¶</a></h3>
+<p>A counting semaphore maintains a count (0 to N), useful for managing multiple identical resources.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create counting semaphore for 5 buffers</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">buffer_sem</span><span class="p">;</span>
+<span class="cp">#define MAX_BUFFERS 5</span>
+<span class="n">buffer_sem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateCounting</span><span class="p">(</span><span class="n">MAX_BUFFERS</span><span class="p">,</span><span class="w"> </span><span class="n">MAX_BUFFERS</span><span class="p">);</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Acquire buffer</span>
+<span class="w">        </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">buffer_sem</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">        </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">buffer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">allocate_buffer</span><span class="p">();</span>
+<span class="w">        </span><span class="n">process_data</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+<span class="w">        </span><span class="n">free_buffer</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Release buffer</span>
+<span class="w">        </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">buffer_sem</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="semaphore-patterns">
+<h3>Semaphore Patterns<a class="headerlink" href="#semaphore-patterns" title="Link to this heading">¶</a></h3>
+<p><strong>Signaling Pattern:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Producer signals consumer</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">producer</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">produce_data</span><span class="p">();</span>
+<span class="w">        </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">data_ready_sem</span><span class="p">);</span><span class="w">  </span><span class="c1">// Signal</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">consumer</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">data_ready_sem</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// Wait</span>
+<span class="w">        </span><span class="n">consume_data</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Rendezvous Pattern:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">sem1</span><span class="p">,</span><span class="w"> </span><span class="n">sem2</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task1</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">do_work1</span><span class="p">();</span>
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">sem1</span><span class="p">);</span><span class="w">        </span><span class="c1">// Signal task2</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">sem2</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// Wait for task2</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task2</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">do_work2</span><span class="p">();</span>
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">sem2</span><span class="p">);</span><span class="w">        </span><span class="c1">// Signal task1</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">sem1</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// Wait for task1</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mutexes">
+<h2>Mutexes<a class="headerlink" href="#mutexes" title="Link to this heading">¶</a></h2>
+<p>A <strong>mutex</strong> (mutual exclusion) protects shared resources, ensuring only one task accesses the resource at a time.</p>
+<section id="basic-mutex">
+<h3>Basic Mutex<a class="headerlink" href="#basic-mutex" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">resource_mutex</span><span class="p">;</span>
+<span class="n">resource_mutex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateMutex</span><span class="p">();</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">shared_counter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Lock mutex</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">resource_mutex</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Critical section</span>
+<span class="w">            </span><span class="n">shared_counter</span><span class="o">++</span><span class="p">;</span>
+
+<span class="w">            </span><span class="c1">// Unlock mutex</span>
+<span class="w">            </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">resource_mutex</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="priority-inheritance">
+<h3>Priority Inheritance<a class="headerlink" href="#priority-inheritance" title="Link to this heading">¶</a></h3>
+<p>Mutexes support <strong>priority inheritance</strong> to prevent priority inversion.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create mutex with priority inheritance</span>
+<span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">mutex</span><span class="p">;</span>
+<span class="n">mutex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateMutex</span><span class="p">();</span><span class="w">  </span><span class="c1">// Automatic priority inheritance</span>
+
+<span class="c1">// Without priority inheritance (binary semaphore):</span>
+<span class="c1">// Low-priority task holds resource</span>
+<span class="c1">// High-priority task blocks</span>
+<span class="c1">// Medium-priority task preempts low-priority task</span>
+<span class="c1">// = Priority inversion!</span>
+
+<span class="c1">// With priority inheritance:</span>
+<span class="c1">// Low-priority task inherits high-priority task&#39;s priority</span>
+<span class="c1">// Medium-priority task cannot preempt</span>
+<span class="c1">// = Problem solved!</span>
+</pre></div>
+</div>
+</section>
+<section id="recursive-mutexes">
+<h3>Recursive Mutexes<a class="headerlink" href="#recursive-mutexes" title="Link to this heading">¶</a></h3>
+<p>A <strong>recursive mutex</strong> can be locked multiple times by the same task.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">recursive_mutex</span><span class="p">;</span>
+<span class="n">recursive_mutex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateRecursiveMutex</span><span class="p">();</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">function_a</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTakeRecursive</span><span class="p">(</span><span class="n">recursive_mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="n">function_b</span><span class="p">();</span><span class="w">  </span><span class="c1">// Also needs mutex</span>
+<span class="w">    </span><span class="n">xSemaphoreGiveRecursive</span><span class="p">(</span><span class="n">recursive_mutex</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">function_b</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTakeRecursive</span><span class="p">(</span><span class="n">recursive_mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Same task can acquire again</span>
+<span class="w">    </span><span class="n">do_work</span><span class="p">();</span>
+<span class="w">    </span><span class="n">xSemaphoreGiveRecursive</span><span class="p">(</span><span class="n">recursive_mutex</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="mutex-guidelines">
+<h3>Mutex Guidelines<a class="headerlink" href="#mutex-guidelines" title="Link to this heading">¶</a></h3>
+<p><strong>DO:</strong>
+- Use mutexes for protecting shared data
+- Keep critical sections short
+- Always unlock in the same task that locked
+- Use priority inheritance</p>
+<p><strong>DON’T:</strong>
+- Call from ISRs (use semaphores instead)
+- Hold multiple mutexes (avoid deadlock)
+- Perform blocking operations while holding mutex
+- Use for task synchronization (use semaphores)</p>
+</section>
+<section id="deadlock-prevention">
+<h3>Deadlock Prevention<a class="headerlink" href="#deadlock-prevention" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// BAD: Potential deadlock</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">task1</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_A</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_B</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// Inverted order!</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task2</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_B</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_A</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// Inverted order!</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="c1">// GOOD: Always acquire in same order</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">task1</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_A</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// A before B</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_B</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task2</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_A</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span><span class="w">  </span><span class="c1">// A before B</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">mutex_B</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="queues">
+<h2>Queues<a class="headerlink" href="#queues" title="Link to this heading">¶</a></h2>
+<p><strong>Queues</strong> enable safe, ordered data transfer between tasks.</p>
+<section id="creating-and-using-queues">
+<h3>Creating and Using Queues<a class="headerlink" href="#creating-and-using-queues" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define message structure</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">sensor_id</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int16_t</span><span class="w"> </span><span class="n">temperature</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">sensor_msg_t</span><span class="p">;</span>
+
+<span class="c1">// Create queue</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">sensor_queue</span><span class="p">;</span>
+<span class="n">sensor_queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">sensor_msg_t</span><span class="p">));</span>
+
+<span class="c1">// Producer task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">sensor_reader_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">sensor_msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">msg</span><span class="p">.</span><span class="n">sensor_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">        </span><span class="n">msg</span><span class="p">.</span><span class="n">temperature</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">read_temperature</span><span class="p">();</span>
+<span class="w">        </span><span class="n">msg</span><span class="p">.</span><span class="n">timestamp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetTickCount</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Send to queue (blocks if full)</span>
+<span class="w">        </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">sensor_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Consumer task</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">data_logger_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">sensor_msg_t</span><span class="w"> </span><span class="n">msg</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Receive from queue (blocks if empty)</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">sensor_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">log_data</span><span class="p">(</span><span class="n">msg</span><span class="p">.</span><span class="n">sensor_id</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">.</span><span class="n">temperature</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">.</span><span class="n">timestamp</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="queue-variations">
+<h3>Queue Variations<a class="headerlink" href="#queue-variations" title="Link to this heading">¶</a></h3>
+<p><strong>Send to Front:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Urgent message - jump the queue</span>
+<span class="n">xQueueSendToFront</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">urgent_msg</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><strong>Peek Without Removing:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Look at message without consuming it</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">xQueuePeek</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">pdTRUE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Message still in queue</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>From ISR:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">UART_IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">received_char</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">UART</span><span class="o">-&gt;</span><span class="n">DR</span><span class="p">;</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">xQueueSendFromISR</span><span class="p">(</span><span class="n">uart_queue</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">received_char</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="queue-use-cases">
+<h3>Queue Use Cases<a class="headerlink" href="#queue-use-cases" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p><strong>Producer-Consumer</strong>: Data pipeline between tasks</p></li>
+<li><p><strong>Command Dispatcher</strong>: Serialize command execution</p></li>
+<li><p><strong>Event Logging</strong>: Collect events from multiple sources</p></li>
+<li><p><strong>Rate Limiting</strong>: Buffer bursts of data</p></li>
+</ol>
+</section>
+</section>
+<section id="event-groups">
+<h2>Event Groups<a class="headerlink" href="#event-groups" title="Link to this heading">¶</a></h2>
+<p><strong>Event groups</strong> manage multiple binary flags (events) as a group, useful for synchronizing on multiple conditions.</p>
+<section id="basic-usage">
+<h3>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;event_groups.h&quot;</span>
+
+<span class="c1">// Define event bits</span>
+<span class="cp">#define EVENT_BIT_0  (1 &lt;&lt; 0)  </span><span class="c1">// 0x01</span>
+<span class="cp">#define EVENT_BIT_1  (1 &lt;&lt; 1)  </span><span class="c1">// 0x02</span>
+<span class="cp">#define EVENT_BIT_2  (1 &lt;&lt; 2)  </span><span class="c1">// 0x04</span>
+
+<span class="n">EventGroupHandle_t</span><span class="w"> </span><span class="n">event_group</span><span class="p">;</span>
+<span class="n">event_group</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xEventGroupCreate</span><span class="p">();</span>
+
+<span class="c1">// Task sets events</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">task1</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">do_work</span><span class="p">();</span>
+<span class="w">        </span><span class="n">xEventGroupSetBits</span><span class="p">(</span><span class="n">event_group</span><span class="p">,</span><span class="w"> </span><span class="n">EVENT_BIT_0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Task waits for multiple events</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">task2</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for BOTH bit 0 AND bit 1</span>
+<span class="w">        </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">bits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xEventGroupWaitBits</span><span class="p">(</span>
+<span class="w">            </span><span class="n">event_group</span><span class="p">,</span>
+<span class="w">            </span><span class="n">EVENT_BIT_0</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">EVENT_BIT_1</span><span class="p">,</span><span class="w">  </span><span class="c1">// Bits to wait for</span>
+<span class="w">            </span><span class="n">pdTRUE</span><span class="p">,</span><span class="w">   </span><span class="c1">// Clear on exit</span>
+<span class="w">            </span><span class="n">pdTRUE</span><span class="p">,</span><span class="w">   </span><span class="c1">// Wait for ALL bits (AND)</span>
+<span class="w">            </span><span class="n">portMAX_DELAY</span>
+<span class="w">        </span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">process_combined_event</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="synchronization-patterns">
+<h3>Synchronization Patterns<a class="headerlink" href="#synchronization-patterns" title="Link to this heading">¶</a></h3>
+<p><strong>Barrier Synchronization:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define TASK1_BIT  (1 &lt;&lt; 0)</span>
+<span class="cp">#define TASK2_BIT  (1 &lt;&lt; 1)</span>
+<span class="cp">#define TASK3_BIT  (1 &lt;&lt; 2)</span>
+<span class="cp">#define ALL_TASKS  (TASK1_BIT | TASK2_BIT | TASK3_BIT)</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">task1</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">phase1_work</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Signal completion and wait for others</span>
+<span class="w">    </span><span class="n">xEventGroupSync</span><span class="p">(</span><span class="n">event_group</span><span class="p">,</span><span class="w"> </span><span class="n">TASK1_BIT</span><span class="p">,</span><span class="w"> </span><span class="n">ALL_TASKS</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">phase2_work</span><span class="p">();</span><span class="w">  </span><span class="c1">// All tasks synchronized here</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>State Machine:</strong></p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define STATE_INIT       (1 &lt;&lt; 0)</span>
+<span class="cp">#define STATE_READY      (1 &lt;&lt; 1)</span>
+<span class="cp">#define STATE_RUNNING    (1 &lt;&lt; 2)</span>
+<span class="cp">#define STATE_ERROR      (1 &lt;&lt; 3)</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">control_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xEventGroupSetBits</span><span class="p">(</span><span class="n">state_group</span><span class="p">,</span><span class="w"> </span><span class="n">STATE_INIT</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">initialize</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">SUCCESS</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">xEventGroupClearBits</span><span class="p">(</span><span class="n">state_group</span><span class="p">,</span><span class="w"> </span><span class="n">STATE_INIT</span><span class="p">);</span>
+<span class="w">        </span><span class="n">xEventGroupSetBits</span><span class="p">(</span><span class="n">state_group</span><span class="p">,</span><span class="w"> </span><span class="n">STATE_READY</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">monitor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">EventBits_t</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xEventGroupWaitBits</span><span class="p">(</span>
+<span class="w">            </span><span class="n">state_group</span><span class="p">,</span>
+<span class="w">            </span><span class="n">STATE_ERROR</span><span class="p">,</span>
+<span class="w">            </span><span class="n">pdFALSE</span><span class="p">,</span><span class="w">  </span><span class="c1">// Don&#39;t clear</span>
+<span class="w">            </span><span class="n">pdFALSE</span><span class="p">,</span><span class="w">  </span><span class="c1">// Any bit</span>
+<span class="w">            </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
+<span class="w">        </span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">state</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">STATE_ERROR</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">handle_error</span><span class="p">();</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="critical-sections">
+<h2>Critical Sections<a class="headerlink" href="#critical-sections" title="Link to this heading">¶</a></h2>
+<section id="disable-interrupts">
+<h3>Disable Interrupts<a class="headerlink" href="#disable-interrupts" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS critical sections</span>
+<span class="n">taskENTER_CRITICAL</span><span class="p">();</span>
+<span class="n">shared_variable</span><span class="o">++</span><span class="p">;</span>
+<span class="n">taskEXIT_CRITICAL</span><span class="p">();</span>
+
+<span class="c1">// From ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">saved_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">taskENTER_CRITICAL_FROM_ISR</span><span class="p">();</span>
+<span class="w">    </span><span class="n">shared_isr_data</span><span class="o">++</span><span class="p">;</span>
+<span class="w">    </span><span class="n">taskEXIT_CRITICAL_FROM_ISR</span><span class="p">(</span><span class="n">saved_mask</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>⚠️ <strong>Warning</strong>: Keep critical sections extremely short (&lt; 10 µs) to maintain real-time performance.</p>
+</section>
+<section id="scheduler-locking">
+<h3>Scheduler Locking<a class="headerlink" href="#scheduler-locking" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Suspend scheduler (interrupts still active)</span>
+<span class="n">vTaskSuspendAll</span><span class="p">();</span>
+<span class="c1">// Only this task can run; no context switching</span>
+<span class="n">shared_data</span><span class="p">.</span><span class="n">value1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_value1</span><span class="p">;</span>
+<span class="n">shared_data</span><span class="p">.</span><span class="n">value2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">new_value2</span><span class="p">;</span>
+<span class="n">xTaskResumeAll</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="notification-mechanism">
+<h2>Notification Mechanism<a class="headerlink" href="#notification-mechanism" title="Link to this heading">¶</a></h2>
+<p><strong>Task notifications</strong> are a lightweight alternative to semaphores/queues for simple signaling.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">task_handle</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">waiting_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Wait for notification</span>
+<span class="w">        </span><span class="n">ulTaskNotifyTake</span><span class="p">(</span><span class="n">pdTRUE</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+<span class="w">        </span><span class="n">handle_notification</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">signaling_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">do_work</span><span class="p">();</span>
+<span class="w">        </span><span class="c1">// Notify task</span>
+<span class="w">        </span><span class="n">xTaskNotifyGive</span><span class="p">(</span><span class="n">task_handle</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// From ISR</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">IRQHandler</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">BaseType_t</span><span class="w"> </span><span class="n">higher_priority_woken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pdFALSE</span><span class="p">;</span>
+<span class="w">    </span><span class="n">vTaskNotifyGiveFromISR</span><span class="p">(</span><span class="n">task_handle</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="w">    </span><span class="n">portYIELD_FROM_ISR</span><span class="p">(</span><span class="n">higher_priority_woken</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Advantages:</strong>
+- Faster than semaphores (direct task notification)
+- No separate object creation
+- Lower RAM usage</p>
+<p><strong>Limitations:</strong>
+- Only one notification per task
+- Only one task can wait
+- No queuing of multiple notifications</p>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Choose the right primitive:</strong>
+- Mutex: Protecting shared data
+- Binary semaphore: Event signaling
+- Counting semaphore: Managing pools
+- Queue: Data transfer
+- Event group: Multiple conditions</p></li>
+<li><p><strong>Avoid common mistakes:</strong>
+- Don’t use mutexes in ISRs
+- Don’t hold mutexes while blocking
+- Always check return values
+- Use timeouts to prevent deadlock</p></li>
+<li><p><strong>Performance considerations:</strong>
+- Task notifications faster than semaphores
+- Direct-to-task notifications when possible
+- Size queues appropriately</p></li>
+<li><p><strong>Testing:</strong>
+- Stress test with multiple tasks
+- Test timeout scenarios
+- Validate priority inheritance
+- Check for resource leaks</p></li>
+</ol>
+</section>
+<section id="comparison-table">
+<h2>Comparison Table<a class="headerlink" href="#comparison-table" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Feature</p></th>
+<th class="head"><p>Semaphore</p></th>
+<th class="head"><p>Mutex</p></th>
+<th class="head"><p>Queue</p></th>
+<th class="head"><p>Event Group</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Signaling</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>Data Transfer</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>Priority Inherit</p></td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-odd"><td><p>From ISR</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-even"><td><p>Multiple Waiters</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>Recursive</p></td>
+<td><p>No</p></td>
+<td><p>Optional</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day05.html"><span class="doc">Day 05 - Semaphores and Mutexes</span></a> - Semaphores and Mutexes</p></li>
+<li><p><a class="reference internal" href="../days/day06.html"><span class="doc">Day 06 - Queues and Event Groups</span></a> - Queues and Event Groups</p></li>
+<li><p><a class="reference internal" href="rtos_basics.html"><span class="doc">RTOS Basics</span></a> - Task states and scheduling</p></li>
+<li><p><a class="reference internal" href="../patterns/producer_consumer.html"><span class="doc">Producer-Consumer</span></a> - Producer-consumer pattern</p></li>
+<li><p><a class="reference internal" href="interrupts.html"><span class="doc">Interrupt Handling</span></a> - ISR synchronization</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“The Little Book of Semaphores” by Allen B. Downey</p></li>
+<li><p>“Concurrent Programming” by Ben-Ari</p></li>
+<li><p>FreeRTOS documentation on synchronization primitives</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/overview/synchronization.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

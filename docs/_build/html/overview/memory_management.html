@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Memory Management &#8212; Learn Embedded RTOS in 20 Days 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="memory-management">
+<h1>Memory Management<a class="headerlink" href="#memory-management" title="Link to this heading">¶</a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Link to this heading">¶</a></h2>
+<p><strong>Memory management</strong> in RTOS systems involves careful allocation, tracking, and protection of RAM resources. Unlike desktop systems with virtual memory and gigabytes of RAM, embedded systems often have:</p>
+<ul class="simple">
+<li><p>Limited RAM (often kilobytes, not megabytes)</p></li>
+<li><p>No virtual memory or memory protection</p></li>
+<li><p>Deterministic memory requirements</p></li>
+<li><p>Long-term reliability needs (days, months, years of operation)</p></li>
+</ul>
+<p>This guide covers heap allocation schemes, stack management, memory pools, and best practices.</p>
+</section>
+<section id="memory-layout">
+<h2>Memory Layout<a class="headerlink" href="#memory-layout" title="Link to this heading">¶</a></h2>
+<section id="typical-embedded-memory-map">
+<h3>Typical Embedded Memory Map<a class="headerlink" href="#typical-embedded-memory-map" title="Link to this heading">¶</a></h3>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>HIGH ADDRESS
+┌──────────────────┐
+│   Stack (Task N) │ ← Grows down
+├──────────────────┤
+│        ...       │
+├──────────────────┤
+│   Stack (Task 1) │ ← Grows down
+├──────────────────┤
+│   Heap (dynamic) │ ← Grows up
+├──────────────────┤
+│   BSS (zeroed)   │ ← Uninitialized globals
+├──────────────────┤
+│   Data (init)    │ ← Initialized globals
+├──────────────────┤
+│   Text (code)    │ ← Program instructions
+└──────────────────┘
+LOW ADDRESS
+</pre></div>
+</div>
+</section>
+<section id="sections">
+<h3>Sections<a class="headerlink" href="#sections" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Text</strong>: Program code (Flash/ROM)</p></li>
+<li><p><strong>Data</strong>: Initialized global/static variables (RAM)</p></li>
+<li><p><strong>BSS</strong>: Zero-initialized global/static variables (RAM)</p></li>
+<li><p><strong>Heap</strong>: Dynamic allocations (RAM)</p></li>
+<li><p><strong>Stack</strong>: Function calls, local variables (RAM)</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Different memory sections</span>
+<span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">rom_var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span><span class="w">        </span><span class="c1">// .text (Flash)</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">data_var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">42</span><span class="p">;</span><span class="w">              </span><span class="c1">// .data (RAM, initialized)</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">bss_var</span><span class="p">;</span><span class="w">                    </span><span class="c1">// .bss (RAM, zero-init)</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">static_var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w">     </span><span class="c1">// .data</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">function</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">local_var</span><span class="p">;</span><span class="w">              </span><span class="c1">// Stack</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">func_static</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w"> </span><span class="c1">// .data</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="n">heap_var</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">malloc</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span><span class="w">  </span><span class="c1">// Heap</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="stack-management">
+<h2>Stack Management<a class="headerlink" href="#stack-management" title="Link to this heading">¶</a></h2>
+<section id="task-stacks">
+<h3>Task Stacks<a class="headerlink" href="#task-stacks" title="Link to this heading">¶</a></h3>
+<p>Each task requires its own stack for:
+- Local variables
+- Function call return addresses
+- CPU register context
+- Interrupt context (if interrupted)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS: Stack size in words (4 bytes on ARM Cortex-M)</span>
+<span class="cp">#define STACK_SIZE_SMALL   128   </span><span class="c1">// 512 bytes</span>
+<span class="cp">#define STACK_SIZE_MEDIUM  256   </span><span class="c1">// 1 KB</span>
+<span class="cp">#define STACK_SIZE_LARGE   512   </span><span class="c1">// 2 KB</span>
+
+<span class="n">xTaskCreate</span><span class="p">(</span>
+<span class="w">    </span><span class="n">small_task</span><span class="p">,</span><span class="w">       </span><span class="c1">// Task function</span>
+<span class="w">    </span><span class="s">&quot;Small&quot;</span><span class="p">,</span><span class="w">          </span><span class="c1">// Name</span>
+<span class="w">    </span><span class="n">STACK_SIZE_SMALL</span><span class="p">,</span><span class="w"> </span><span class="c1">// Stack size</span>
+<span class="w">    </span><span class="nb">NULL</span><span class="p">,</span><span class="w">             </span><span class="c1">// Parameters</span>
+<span class="w">    </span><span class="mi">1</span><span class="p">,</span><span class="w">                </span><span class="c1">// Priority</span>
+<span class="w">    </span><span class="nb">NULL</span><span class="w">              </span><span class="c1">// Task handle</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="stack-size-determination">
+<h3>Stack Size Determination<a class="headerlink" href="#stack-size-determination" title="Link to this heading">¶</a></h3>
+<p><strong>Methods:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Static Analysis</strong>: Calculate maximum call depth and local variables</p></li>
+<li><p><strong>Runtime Measurement</strong>: Use stack watermarking</p></li>
+<li><p><strong>Conservative Estimation</strong>: Oversize and measure</p></li>
+</ol>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Stack watermarking (FreeRTOS example)</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">monitor_task</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Get minimum free stack space (watermark)</span>
+<span class="w">        </span><span class="n">UBaseType_t</span><span class="w"> </span><span class="n">stack_free</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">uxTaskGetStackHighWaterMark</span><span class="p">(</span><span class="nb">NULL</span><span class="p">);</span>
+
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Stack free: %u words</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">stack_free</span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">stack_free</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">50</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Warning: stack nearly full!</span>
+<span class="w">        </span><span class="p">}</span>
+
+<span class="w">        </span><span class="n">vTaskDelay</span><span class="p">(</span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="stack-overflow-detection">
+<h3>Stack Overflow Detection<a class="headerlink" href="#stack-overflow-detection" title="Link to this heading">¶</a></h3>
+<p><strong>Method 1: Stack Canary</strong> (FreeRTOS)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOSConfig.h</span>
+<span class="cp">#define configCHECK_FOR_STACK_OVERFLOW  2  </span><span class="c1">// Method 2 (canary checking)</span>
+
+<span class="c1">// Hook function</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">vApplicationStackOverflowHook</span><span class="p">(</span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">xTask</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">pcTaskName</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Task stack overflow detected!</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Stack overflow in task: %s</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">pcTaskName</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// Handle error (log, reset, enter safe mode)</span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// Halt for debugging</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Method 2: MPU Protection</strong> (ARM Cortex-M with MPU)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure MPU region for stack guard</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">configure_stack_protection</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">stack_base</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">stack_size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Create no-access guard page below stack</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RBAR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">)</span><span class="n">stack_base</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RBAR_VALID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RASR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MPU_RASR_ENABLE</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RASR_SIZE_256</span><span class="w">  </span><span class="c1">// Guard page size</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_NO_ACCESS</span><span class="p">;</span><span class="w">     </span><span class="c1">// No read/write</span>
+
+<span class="w">    </span><span class="c1">// Any access to guard triggers MemManage fault</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="dynamic-memory-allocation">
+<h2>Dynamic Memory Allocation<a class="headerlink" href="#dynamic-memory-allocation" title="Link to this heading">¶</a></h2>
+<section id="standard-malloc-free">
+<h3>Standard malloc/free<a class="headerlink" href="#standard-malloc-free" title="Link to this heading">¶</a></h3>
+<p><strong>Problems for RTOS:</strong>
+- Non-deterministic timing
+- Fragmentation over time
+- Not thread-safe by default
+- Can fail unpredictably</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Standard malloc - generally NOT recommended for real-time</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">malloc</span><span class="p">(</span><span class="mi">256</span><span class="p">);</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ptr</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Out of memory - what now?</span>
+<span class="p">}</span>
+<span class="c1">// Use ptr...</span>
+<span class="n">free</span><span class="p">(</span><span class="n">ptr</span><span class="p">);</span><span class="w">  </span><span class="c1">// May cause fragmentation</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="rtos-heap-schemes">
+<h2>RTOS Heap Schemes<a class="headerlink" href="#rtos-heap-schemes" title="Link to this heading">¶</a></h2>
+<p>FreeRTOS provides multiple heap implementations with different trade-offs.</p>
+<section id="heap-1-static-allocation">
+<h3>Heap_1: Static Allocation<a class="headerlink" href="#heap-1-static-allocation" title="Link to this heading">¶</a></h3>
+<p><strong>Characteristics:</strong>
+- Allocation only (no free)
+- Zero fragmentation
+- Simplest and fastest
+- For static task creation</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// heap_1: Allocation from fixed array</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">heap</span><span class="p">[</span><span class="mi">10240</span><span class="p">];</span><span class="w">  </span><span class="c1">// 10KB heap</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">pvPortMalloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">next_free</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">next_free</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">heap</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">heap</span><span class="p">[</span><span class="n">next_free</span><span class="p">];</span>
+<span class="w">        </span><span class="n">next_free</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">size</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">vPortFree</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Does nothing</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Use case</strong>: Systems where all tasks/objects created at startup.</p>
+</section>
+<section id="heap-2-best-fit-allocation">
+<h3>Heap_2: Best-Fit Allocation<a class="headerlink" href="#heap-2-best-fit-allocation" title="Link to this heading">¶</a></h3>
+<p><strong>Characteristics:</strong>
+- Allocation and free supported
+- Best-fit algorithm
+- Can fragment
+- Not deterministic</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Use like malloc/free</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pvPortMalloc</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="c1">// ...</span>
+<span class="n">vPortFree</span><span class="p">(</span><span class="n">ptr</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><strong>Use case</strong>: Applications with moderate dynamic allocation needs.</p>
+</section>
+<section id="heap-3-wrapped-malloc-free">
+<h3>Heap_3: Wrapped malloc/free<a class="headerlink" href="#heap-3-wrapped-malloc-free" title="Link to this heading">¶</a></h3>
+<p><strong>Characteristics:</strong>
+- Uses standard library malloc/free
+- Thread-safety added
+- Timing depends on libc implementation</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Suspends scheduler during allocation</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">pvPortMalloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vTaskSuspendAll</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">malloc</span><span class="p">(</span><span class="n">size</span><span class="p">);</span>
+<span class="w">    </span><span class="n">xTaskResumeAll</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Use case</strong>: When you must use standard malloc (for compatibility).</p>
+</section>
+<section id="heap-4-first-fit-with-coalescing">
+<h3>Heap_4: First-Fit with Coalescing<a class="headerlink" href="#heap-4-first-fit-with-coalescing" title="Link to this heading">¶</a></h3>
+<p><strong>Characteristics:</strong>
+- Allocation and free
+- Adjacent free blocks coalesce
+- Reduces fragmentation
+- Reasonably deterministic</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// FreeRTOS heap_4 - recommended for most applications</span>
+<span class="cp">#define configTOTAL_HEAP_SIZE  (20 * 1024)  </span><span class="c1">// 20KB</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">example</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pvPortMalloc</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">p2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pvPortMalloc</span><span class="p">(</span><span class="mi">200</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vPortFree</span><span class="p">(</span><span class="n">p1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">vPortFree</span><span class="p">(</span><span class="n">p2</span><span class="p">);</span>
+<span class="w">    </span><span class="c1">// p1 and p2 regions coalesce into one free block</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Use case</strong>: General-purpose applications with dynamic allocation.</p>
+</section>
+<section id="heap-5-multi-region-support">
+<h3>Heap_5: Multi-Region Support<a class="headerlink" href="#heap-5-multi-region-support" title="Link to this heading">¶</a></h3>
+<p><strong>Characteristics:</strong>
+- Like heap_4 but supports multiple memory regions
+- Useful for systems with separate RAM banks</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Define memory regions</span>
+<span class="k">const</span><span class="w"> </span><span class="n">HeapRegion_t</span><span class="w"> </span><span class="n">xHeapRegions</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="mh">0x20000000</span><span class="p">,</span><span class="w"> </span><span class="mh">0x8000</span><span class="w"> </span><span class="p">},</span><span class="w">  </span><span class="c1">// 32KB internal RAM</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="mh">0x60000000</span><span class="p">,</span><span class="w"> </span><span class="mh">0x40000</span><span class="w"> </span><span class="p">},</span><span class="w"> </span><span class="c1">// 256KB external RAM</span>
+<span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span><span class="w">                         </span><span class="c1">// Terminator</span>
+<span class="p">};</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">setup_heap</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">vPortDefineHeapRegions</span><span class="p">(</span><span class="n">xHeapRegions</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Use case</strong>: Systems with multiple RAM regions (internal + external).</p>
+</section>
+<section id="heap-monitoring">
+<h3>Heap Monitoring<a class="headerlink" href="#heap-monitoring" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">check_heap_status</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">free_heap</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xPortGetFreeHeapSize</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">min_ever</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xPortGetMinimumEverFreeHeapSize</span><span class="p">();</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Heap free: %u bytes</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">free_heap</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Minimum ever free: %u bytes</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">min_ever</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">min_ever</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1024</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Warning: heap nearly exhausted</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="memory-pools">
+<h2>Memory Pools<a class="headerlink" href="#memory-pools" title="Link to this heading">¶</a></h2>
+<p><strong>Memory pools</strong> provide fixed-size block allocation with:
+- O(1) constant-time allocation/free
+- Zero fragmentation
+- Deterministic behavior
+- Perfect for real-time systems</p>
+<section id="implementation">
+<h3>Implementation<a class="headerlink" href="#implementation" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define POOL_SIZE 10</span>
+<span class="cp">#define BLOCK_SIZE 64</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">blocks</span><span class="p">[</span><span class="n">POOL_SIZE</span><span class="p">][</span><span class="n">BLOCK_SIZE</span><span class="p">];</span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">allocated</span><span class="p">[</span><span class="n">POOL_SIZE</span><span class="p">];</span>
+<span class="w">    </span><span class="n">SemaphoreHandle_t</span><span class="w"> </span><span class="n">mutex</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">memory_pool_t</span><span class="p">;</span>
+
+<span class="n">memory_pool_t</span><span class="w"> </span><span class="n">pool</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">pool_init</span><span class="p">(</span><span class="n">memory_pool_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">memset</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">allocated</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">allocated</span><span class="p">));</span>
+<span class="w">    </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">mutex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xSemaphoreCreateMutex</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">pool_alloc</span><span class="p">(</span><span class="n">memory_pool_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">POOL_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">allocated</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">allocated</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+<span class="w">            </span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">blocks</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">mutex</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">pool_free</span><span class="p">(</span><span class="n">memory_pool_t</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xSemaphoreTake</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">mutex</span><span class="p">,</span><span class="w"> </span><span class="n">portMAX_DELAY</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">POOL_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">blocks</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">ptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">p</span><span class="o">-&gt;</span><span class="n">allocated</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">xSemaphoreGive</span><span class="p">(</span><span class="n">p</span><span class="o">-&gt;</span><span class="n">mutex</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="using-memory-pools">
+<h3>Using Memory Pools<a class="headerlink" href="#using-memory-pools" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Network packet pool example</span>
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">data</span><span class="p">[</span><span class="mi">1500</span><span class="p">];</span><span class="w">  </span><span class="c1">// MTU size</span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">length</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">packet_t</span><span class="p">;</span>
+
+<span class="cp">#define PACKET_POOL_SIZE 20</span>
+<span class="n">packet_t</span><span class="w"> </span><span class="n">packet_pool</span><span class="p">[</span><span class="n">PACKET_POOL_SIZE</span><span class="p">];</span>
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">free_packets</span><span class="p">;</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">init_packet_pool</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">free_packets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreate</span><span class="p">(</span><span class="n">PACKET_POOL_SIZE</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">packet_t</span><span class="w"> </span><span class="o">*</span><span class="p">));</span>
+
+<span class="w">    </span><span class="c1">// Add all packets to free list</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">PACKET_POOL_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">packet_t</span><span class="w"> </span><span class="o">*</span><span class="n">pkt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">packet_pool</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+<span class="w">        </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">free_packets</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">pkt</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="n">packet_t</span><span class="w"> </span><span class="o">*</span><span class="nf">packet_alloc</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">packet_t</span><span class="w"> </span><span class="o">*</span><span class="n">pkt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="n">xQueueReceive</span><span class="p">(</span><span class="n">free_packets</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">pkt</span><span class="p">,</span><span class="w"> </span><span class="n">pdMS_TO_TICKS</span><span class="p">(</span><span class="mi">100</span><span class="p">));</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">pkt</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">packet_free</span><span class="p">(</span><span class="n">packet_t</span><span class="w"> </span><span class="o">*</span><span class="n">pkt</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">xQueueSend</span><span class="p">(</span><span class="n">free_packets</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">pkt</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="memory-protection">
+<h2>Memory Protection<a class="headerlink" href="#memory-protection" title="Link to this heading">¶</a></h2>
+<section id="mpu-memory-protection-unit">
+<h3>MPU (Memory Protection Unit)<a class="headerlink" href="#mpu-memory-protection-unit" title="Link to this heading">¶</a></h3>
+<p>ARM Cortex-M3/M4/M7 with MPU can provide:
+- Stack overflow protection
+- Memory region access control
+- Protection between tasks</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Configure MPU region</span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">configure_task_memory_protection</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Region 0: Task stack (RW access)</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RBAR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TASK_STACK_BASE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RBAR_VALID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RASR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MPU_RASR_ENABLE</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RASR_SIZE_4KB</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RW_ACCESS</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Region 1: Task data (RW access)</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RBAR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TASK_DATA_BASE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RBAR_VALID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RASR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MPU_RASR_ENABLE</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RASR_SIZE_16KB</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RW_ACCESS</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Region 2: Shared peripheral (read-only)</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RBAR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PERIPHERAL_BASE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RBAR_VALID</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">RASR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MPU_RASR_ENABLE</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RASR_SIZE_1KB</span>
+<span class="w">              </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_RO_ACCESS</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Enable MPU</span>
+<span class="w">    </span><span class="n">MPU</span><span class="o">-&gt;</span><span class="n">CTRL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MPU_CTRL_ENABLE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MPU_CTRL_PRIVDEFENA</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="static-allocation">
+<h2>Static Allocation<a class="headerlink" href="#static-allocation" title="Link to this heading">¶</a></h2>
+<p>Preferred approach: Allocate at compile-time when possible.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Static task creation (FreeRTOS)</span>
+<span class="k">static</span><span class="w"> </span><span class="n">StackType_t</span><span class="w"> </span><span class="n">task_stack</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span>
+<span class="k">static</span><span class="w"> </span><span class="n">StaticTask_t</span><span class="w"> </span><span class="n">task_tcb</span><span class="p">;</span>
+
+<span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskCreateStatic</span><span class="p">(</span>
+<span class="w">    </span><span class="n">task_function</span><span class="p">,</span>
+<span class="w">    </span><span class="s">&quot;StaticTask&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">256</span><span class="p">,</span><span class="w">              </span><span class="c1">// Stack size</span>
+<span class="w">    </span><span class="nb">NULL</span><span class="p">,</span>
+<span class="w">    </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">    </span><span class="n">task_stack</span><span class="p">,</span><span class="w">       </span><span class="c1">// Pre-allocated stack</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">task_tcb</span><span class="w">         </span><span class="c1">// Pre-allocated TCB</span>
+<span class="p">);</span>
+
+<span class="c1">// Static queue</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">queue_storage</span><span class="p">[</span><span class="mi">10</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">int</span><span class="p">)];</span>
+<span class="k">static</span><span class="w"> </span><span class="n">StaticQueue_t</span><span class="w"> </span><span class="n">queue_struct</span><span class="p">;</span>
+
+<span class="n">QueueHandle_t</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xQueueCreateStatic</span><span class="p">(</span>
+<span class="w">    </span><span class="mi">10</span><span class="p">,</span><span class="w">                </span><span class="c1">// Queue length</span>
+<span class="w">    </span><span class="k">sizeof</span><span class="p">(</span><span class="kt">int</span><span class="p">),</span><span class="w">       </span><span class="c1">// Item size</span>
+<span class="w">    </span><span class="n">queue_storage</span><span class="p">,</span><span class="w">     </span><span class="c1">// Storage array</span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">queue_struct</span><span class="w">      </span><span class="c1">// Queue structure</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<p>Advantages:
+- No runtime allocation failures
+- Deterministic memory usage
+- Can calculate total RAM requirements at compile-time</p>
+</section>
+<section id="best-practices">
+<h2>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Prefer static allocation</strong> over dynamic when possible</p></li>
+<li><p><strong>Use memory pools</strong> for fixed-size objects</p></li>
+<li><p><strong>Size stacks appropriately</strong> (measure, don’t guess)</p></li>
+<li><p><strong>Enable stack overflow detection</strong> during development</p></li>
+<li><p><strong>Monitor heap usage</strong> regularly</p></li>
+<li><p><strong>Avoid malloc/free in ISRs</strong> (never!)</p></li>
+<li><p><strong>Plan for worst-case</strong> memory usage</p></li>
+<li><p><strong>Test with heap exhaustion</strong> scenarios</p></li>
+<li><p><strong>Use const for read-only data</strong> (saves RAM)</p></li>
+<li><p><strong>Consider external RAM</strong> for large buffers</p></li>
+</ol>
+</section>
+<section id="common-pitfalls">
+<h2>Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Stack overflow</strong>: Insufficient stack size</p></li>
+<li><p><strong>Heap fragmentation</strong>: Poor allocation patterns</p></li>
+<li><p><strong>Memory leaks</strong>: Forgetting to free</p></li>
+<li><p><strong>Double free</strong>: Freeing same pointer twice</p></li>
+<li><p><strong>Use after free</strong>: Accessing freed memory</p></li>
+<li><p><strong>Wild pointers</strong>: Uninitialized pointers</p></li>
+<li><p><strong>Buffer overflow</strong>: Writing past array bounds</p></li>
+</ol>
+</section>
+<section id="memory-analysis-tools">
+<h2>Memory Analysis Tools<a class="headerlink" href="#memory-analysis-tools" title="Link to this heading">¶</a></h2>
+<section id="static-analysis">
+<h3>Static Analysis<a class="headerlink" href="#static-analysis" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># GCC: Get size information</span>
+arm-none-eabi-size<span class="w"> </span>firmware.elf
+
+<span class="c1"># Output:</span>
+<span class="c1">#   text    data     bss     dec     hex filename</span>
+<span class="c1">#  12345    1234    5678   19257    4b39 firmware.elf</span>
+</pre></div>
+</div>
+</section>
+<section id="runtime-analysis">
+<h3>Runtime Analysis<a class="headerlink" href="#runtime-analysis" title="Link to this heading">¶</a></h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">print_memory_stats</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">=== Memory Statistics ===</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Heap free: %u bytes</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">xPortGetFreeHeapSize</span><span class="p">());</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Heap minimum ever: %u bytes</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">xPortGetMinimumEverFreeHeapSize</span><span class="p">());</span>
+
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;</span><span class="se">\n</span><span class="s">Task Stack Watermarks:</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">TaskHandle_t</span><span class="w"> </span><span class="n">task</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">name</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span>
+
+<span class="w">    </span><span class="n">task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">xTaskGetHandle</span><span class="p">(</span><span class="s">&quot;Task1&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;  %s: %u words free</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Task1&quot;</span><span class="p">,</span>
+<span class="w">           </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">uxTaskGetStackHighWaterMark</span><span class="p">(</span><span class="n">task</span><span class="p">));</span>
+
+<span class="w">    </span><span class="c1">// Repeat for each task</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="memory-debugging">
+<h2>Memory Debugging<a class="headerlink" href="#memory-debugging" title="Link to this heading">¶</a></h2>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">// Heap allocation tracking</span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">tracked_malloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">line</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pvPortMalloc</span><span class="p">(</span><span class="n">size</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ptr</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Alloc: %p, size: %u at %s:%d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="n">ptr</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="n">line</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Alloc FAILED: size %u at %s:%d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span>
+<span class="w">               </span><span class="p">(</span><span class="kt">unsigned</span><span class="p">)</span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="n">file</span><span class="p">,</span><span class="w"> </span><span class="n">line</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="cp">#define MALLOC(size) tracked_malloc(size, __FILE__, __LINE__)</span>
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../days/day08.html"><span class="doc">Day 08 - Memory and Stack Management</span></a> - Memory and Stack Management</p></li>
+<li><p><a class="reference internal" href="rtos_basics.html"><span class="doc">RTOS Basics</span></a> - Stack and task concepts</p></li>
+<li><p><a class="reference internal" href="../patterns/periodic_scheduler.html"><span class="doc">Periodic Scheduler</span></a> - Static allocation patterns</p></li>
+<li><p><a class="reference internal" href="timing_analysis.html"><span class="doc">Timing Analysis</span></a> - Memory access timing</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>“Embedded Systems Architecture” by Tammy Noergaard</p></li>
+<li><p>FreeRTOS memory management documentation</p></li>
+<li><p>ARM Cortex-M MPU programming guide</p></li>
+<li><p>“C Dynamic Memory Allocation” by Colin Walls</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Learn Embedded RTOS in 20 Days</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../days/index.html">Daily Learning Path</a></li>
+<li class="toctree-l1"><a class="reference internal" href="README.html">Overview Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../patterns/README.html">Patterns Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../comparison/README.html">Comparison Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cheatsheets/README.html">Cheatsheets Documentation</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, Madhavan.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/overview/memory_management.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

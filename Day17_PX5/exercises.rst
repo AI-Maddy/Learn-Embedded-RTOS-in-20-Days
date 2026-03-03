@@ -1,0 +1,1 @@
+Day 17 Exercises - PX5\n=====================\n\nExercise 1: Explore partitioned architecture.\nExercise 2: Compare with non-partitioned RTOS.\nExercise 3: Safety-critical design patterns.

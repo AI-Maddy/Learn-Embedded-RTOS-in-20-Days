@@ -1,0 +1,1 @@
+Day 16 Lesson - NuttX\n===================\n\nPOSIX-compliant RTOS emphasizing standards compliance. Features: VFS, networking, USB, modularity. Used in PX4 autopilot.
