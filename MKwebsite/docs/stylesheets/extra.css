@@ -1,0 +1,24 @@
+/* Grid card improvements */
+.md-typeset .grid.cards > ul > li {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+}
+
+/* Flashcard styling */
+.md-typeset details.question > summary {
+  font-weight: bold;
+}
+
+/* Day progress indicator — abstract admonition in deep-orange */
+.md-typeset .admonition.abstract,
+.md-typeset details.abstract {
+  border-color: #ff6d00;
+}
+.md-typeset .abstract > .admonition-title,
+.md-typeset .abstract > summary {
+  background-color: rgba(255, 109, 0, 0.1);
+}
+.md-typeset .abstract > .admonition-title::before,
+.md-typeset .abstract > summary::before {
+  background-color: #ff6d00;
+}

@@ -1,0 +1,154 @@
+site_name: Learn Embedded RTOS in 20 Days
+site_description: A comprehensive 20-day guide to Real-Time Operating Systems for embedded engineers — covering FreeRTOS, Zephyr, ThreadX, ChibiOS, embOS, NuttX, PX5, and eCos.
+site_author: Madhavan Vivekanandan
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep-orange
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep-orange
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - toc.follow
+  font:
+    text: Inter
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/chip
+    admonition:
+      note: octicons/tag-16
+      abstract: octicons/checklist-16
+      info: octicons/info-16
+      tip: octicons/squirrel-16
+      success: octicons/check-16
+      question: octicons/question-16
+      warning: octicons/alert-16
+      failure: octicons/x-circle-16
+      danger: octicons/zap-16
+      bug: octicons/bug-16
+      example: octicons/beaker-16
+      quote: octicons/quote-16
+
+plugins:
+  - search:
+      lang: en
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - attr_list
+  - md_in_html
+  - tables
+  - def_list
+  - footnotes
+  - toc:
+      permalink: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/madhavan-vivekanandan
+  generator: false
+
+nav:
+  - Home: index.md
+  - Daily Lessons:
+      - Day 01 – Intro to RTOS: days/day01.md
+      - Day 02 – Tasks & Threads: days/day02.md
+      - Day 03 – Scheduling & Determinism: days/day03.md
+      - Day 04 – Context Switching: days/day04.md
+      - Day 05 – Semaphores & Mutexes: days/day05.md
+      - Day 06 – Queues & Event Groups: days/day06.md
+      - Day 07 – Interrupt Handling: days/day07.md
+      - Day 08 – Memory & Stack Management: days/day08.md
+      - Day 09 – Latency & Timing Analysis: days/day09.md
+      - Day 10 – Build Systems & Board Bringup: days/day10.md
+      - Day 11 – FreeRTOS Deep Dive: days/day11.md
+      - Day 12 – Zephyr RTOS: days/day12.md
+      - Day 13 – ChibiOS: days/day13.md
+      - Day 14 – ThreadX: days/day14.md
+      - Day 15 – embOS: days/day15.md
+      - Day 16 – NuttX: days/day16.md
+      - Day 17 – PX5 RTOS: days/day17.md
+      - Day 18 – eCos: days/day18.md
+      - Day 19 – RTOS Comparison & Selection: days/day19.md
+      - Day 20 – Final Project: days/day20.md
+  - RTOS Concepts:
+      - RTOS Basics: overview/rtos-basics.md
+      - Scheduling: overview/scheduling.md
+      - Synchronization: overview/synchronization.md
+      - Memory Management: overview/memory-management.md
+      - Interrupts: overview/interrupts.md
+      - Timing Analysis: overview/timing-analysis.md
+  - Patterns:
+      - Periodic Scheduler: patterns/periodic-scheduler.md
+      - Producer-Consumer: patterns/producer-consumer.md
+      - Command Dispatcher: patterns/command-dispatcher.md
+      - State Machine Tasks: patterns/state-machine-tasks.md
+      - Watchdog & Fault Handling: patterns/watchdog-fault-handling.md
+  - RTOS Comparison:
+      - Comparison Table: comparison/rtos-comparison-table.md
+      - Selection Guide: comparison/selection-guide.md
+      - Licensing & Certification: comparison/licensing.md
+  - Cheatsheets:
+      - FreeRTOS: cheatsheets/freertos.md
+      - Zephyr: cheatsheets/zephyr.md
+      - ThreadX: cheatsheets/threadx.md
+      - ChibiOS: cheatsheets/chibios.md
+      - embOS: cheatsheets/embos.md
+      - NuttX: cheatsheets/nuttx.md
+      - PX5: cheatsheets/px5.md
+      - eCos: cheatsheets/ecos.md
